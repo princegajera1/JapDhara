@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import {
   Play,
   Pause,
@@ -64,7 +64,6 @@ export const Meditation = () => {
     currentMantra,
     meditationHistory,
     addMeditationSession,
-    settings,
   } = useApp();
 
   const [selectedDuration, setSelectedDuration] = useState(5); // in minutes
@@ -75,10 +74,11 @@ export const Meditation = () => {
   const [showCompletionToast, setShowCompletionToast] = useState(false);
   const [soundEnabled, setSoundEnabled] = useState(true);
 
-  // Breathing cycle phase for Breath Focus mode (Inhale, Hold, Exhale, Pause)
+  // Breathing cycle phase for Breath Focus mode
   const [breathPhase, setBreathPhase] = useState('Inhale');
 
   const timerRef = useRef(null);
+  const startTimeRef = useRef(null);
 
   // Sync initial time when user picks duration (and not currently running)
   const handleSelectDuration = (minutes) => {
@@ -95,7 +95,7 @@ export const Meditation = () => {
         setTimeLeft((prev) => {
           if (prev <= 1) {
             clearInterval(timerRef.current);
-            handleCompleteSession();
+            handleCompleteSession(selectedDuration * 60);
             return 0;
           }
           return prev - 1;
@@ -106,7 +106,7 @@ export const Meditation = () => {
     }
 
     return () => clearInterval(timerRef.current);
-  }, [isRunning, isPaused]);
+  }, [isRunning, isPaused, selectedDuration]);
 
   // Breathing cycle timer for Breath Focus mode
   useEffect(() => {
@@ -157,6 +157,7 @@ export const Meditation = () => {
   const handleStartTimer = () => {
     setIsRunning(true);
     setIsPaused(false);
+    startTimeRef.current = Date.now();
     playChimeSound();
   };
 
@@ -176,20 +177,23 @@ export const Meditation = () => {
   };
 
   const handleEndSession = () => {
-    setIsRunning(false);
-    setIsPaused(false);
-    setTimeLeft(selectedDuration * 60);
-    clearInterval(timerRef.current);
+    const totalTargetSecs = selectedDuration * 60;
+    const elapsedSecs = Math.max(1, totalTargetSecs - timeLeft);
+    handleCompleteSession(elapsedSecs);
   };
 
-  const handleCompleteSession = () => {
+  const handleCompleteSession = (elapsedSecs) => {
     setIsRunning(false);
     setIsPaused(false);
     setShowCompletionToast(true);
     playChimeSound();
 
+    const actualSecs = elapsedSecs || Math.max(1, selectedDuration * 60 - timeLeft);
+    const durationMinutes = Math.max(1, Math.round(actualSecs / 60));
+
     addMeditationSession({
-      durationMinutes: selectedDuration,
+      durationSeconds: actualSecs,
+      durationMinutes: durationMinutes,
       mode: selectedMode.title,
     });
 
@@ -203,6 +207,19 @@ export const Meditation = () => {
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
+  // Format duration label (e.g. 2 sec or 5 min)
+  const formatDurationDisplay = (seconds, minutes) => {
+    if (seconds && seconds < 60) {
+      return `${seconds} sec`;
+    }
+    const mins = minutes || Math.floor((seconds || 0) / 60);
+    const secs = seconds ? seconds % 60 : 0;
+    if (secs > 0) {
+      return `${mins} min ${secs} sec`;
+    }
+    return `${mins} min`;
+  };
+
   // Calculate dynamic stats from saved history
   const todayKey = new Date().toISOString().split('T')[0];
 
@@ -211,7 +228,8 @@ export const Meditation = () => {
   }, [meditationHistory, todayKey]);
 
   const todayMinutes = useMemo(() => {
-    return todaySessions.reduce((acc, s) => acc + (s.durationMinutes || 0), 0);
+    const totalSecs = todaySessions.reduce((acc, s) => acc + (s.durationSeconds || (s.durationMinutes * 60) || 0), 0);
+    return Math.round(totalSecs / 60);
   }, [todaySessions]);
 
   const totalSessionsCount = meditationHistory.length;
@@ -229,7 +247,7 @@ export const Meditation = () => {
     <div className="space-y-6 max-w-2xl mx-auto pb-12">
       {/* Toast Notification for Completion */}
       <Toast
-        message="Meditation Complete 🙏"
+        message="Meditation Recorded 🙏"
         type="success"
         isVisible={showCompletionToast}
         onClose={() => setShowCompletionToast(false)}
@@ -464,14 +482,14 @@ export const Meditation = () => {
                   <div className="flex items-center gap-2">
                     <p className="font-semibold text-sm">{session.mode || 'Silent Meditation'}</p>
                     <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
-                      Completed
+                      Completed ✓
                     </span>
                   </div>
                   <p className="text-xs text-light-muted dark:text-dark-muted">{session.date}</p>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
                   <span className="text-xs font-bold text-spiritual-500 px-2.5 py-1 rounded-full bg-spiritual-500/10">
-                    {session.durationMinutes} min
+                    {formatDurationDisplay(session.durationSeconds, session.durationMinutes)}
                   </span>
                   <CheckCircle2 className="w-4 h-4 text-emerald-500" />
                 </div>

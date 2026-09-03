@@ -20,19 +20,21 @@ const KEYS = {
   FAVORITES: 'japdhara_favorite_mantras',
   CUSTOM_MANTRAS: 'japdhara_custom_mantras',
   MEDITATION_HISTORY: 'japdhara_meditation_history',
+  ACTIVE_DATES: 'japdhara_active_dates',
 };
 
 const DEFAULT_PROFILE = {
   name: 'Seeker',
   avatar: '🧘',
   joinedDate: new Date().toISOString(),
+  hasCompletedSetup: false,
 };
 
 const DEFAULT_SETTINGS = {
   soundEnabled: true,
   vibrationEnabled: true,
   hapticFeedback: true,
-  reminderTime: '06:00',
+  reminderTime: '06:00:00',
   remindersEnabled: false,
 };
 
@@ -71,6 +73,18 @@ export const AppProvider = ({ children }) => {
     storage.getItem(KEYS.SETTINGS, DEFAULT_SETTINGS)
   );
 
+  // Active dates tracking for reliable streak calculations
+  const [activeDates, setActiveDatesState] = useState(() => {
+    const saved = storage.getItem(KEYS.ACTIVE_DATES, []);
+    const today = getTodayDateString();
+    if (!saved.includes(today)) {
+      const updated = [...saved, today];
+      storage.setItem(KEYS.ACTIVE_DATES, updated);
+      return updated;
+    }
+    return saved;
+  });
+
   // Today's Jaap Count with automatic Calendar Date rollover check
   const [todayCount, setTodayCountState] = useState(() => {
     const lastDate = storage.getItem(KEYS.LAST_DATE, null);
@@ -95,13 +109,22 @@ export const AppProvider = ({ children }) => {
     storage.getItem(KEYS.MALA_PROGRESS, 1)
   );
 
-  const [streakCount, setStreakCountState] = useState(() =>
-    storage.getItem(KEYS.STREAK, 0)
-  );
-
   const [recentSessions, setRecentSessionsState] = useState(() =>
     storage.getItem(KEYS.HISTORY, storage.getItem('japdhara_recent_activity', []))
   );
+
+  // Mark today as active in storage
+  const markTodayActive = () => {
+    const today = getTodayDateString();
+    setActiveDatesState((prev) => {
+      if (!prev.includes(today)) {
+        const updated = [...prev, today];
+        storage.setItem(KEYS.ACTIVE_DATES, updated);
+        return updated;
+      }
+      return prev;
+    });
+  };
 
   // Sync states with storage
   useEffect(() => {
@@ -151,10 +174,6 @@ export const AppProvider = ({ children }) => {
   }, [completedMalas]);
 
   useEffect(() => {
-    storage.setItem(KEYS.STREAK, streakCount);
-  }, [streakCount]);
-
-  useEffect(() => {
     storage.setItem(KEYS.HISTORY, recentSessions);
     storage.setItem('japdhara_recent_activity', recentSessions);
   }, [recentSessions]);
@@ -163,6 +182,7 @@ export const AppProvider = ({ children }) => {
   const recordChant = (amount = 1) => {
     const today = getTodayDateString();
     storage.setItem(KEYS.LAST_DATE, today);
+    markTodayActive();
 
     // 1. Update Today's Count functionally
     setTodayCountState((prevCount) => prevCount + amount);
@@ -199,6 +219,10 @@ export const AppProvider = ({ children }) => {
   };
 
   const addMeditationSession = (sessionData) => {
+    markTodayActive();
+    const durationSeconds = sessionData.durationSeconds || (sessionData.durationMinutes ? sessionData.durationMinutes * 60 : 0);
+    const durationMinutes = sessionData.durationMinutes || Math.max(1, Math.round(durationSeconds / 60));
+
     const newSession = {
       id: `${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
       date: new Date().toLocaleDateString(undefined, {
@@ -209,7 +233,8 @@ export const AppProvider = ({ children }) => {
         minute: '2-digit',
       }),
       dateKey: getTodayDateString(),
-      durationMinutes: sessionData.durationMinutes || 5,
+      durationSeconds: durationSeconds,
+      durationMinutes: durationMinutes,
       mode: sessionData.mode || 'Silent Meditation',
       completed: true,
       timestamp: new Date().toISOString(),
@@ -280,6 +305,7 @@ export const AppProvider = ({ children }) => {
   };
 
   const addJaapSession = (session) => {
+    markTodayActive();
     const newSession = {
       id: `${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
       date: new Date().toLocaleDateString(undefined, {
@@ -296,13 +322,6 @@ export const AppProvider = ({ children }) => {
       timestamp: new Date().toISOString(),
     };
     setRecentSessionsState((prev) => [newSession, ...prev]);
-  };
-
-  const setStreakCount = (streak) => {
-    const parsed = parseInt(streak, 10);
-    if (!isNaN(parsed)) {
-      setStreakCountState(parsed);
-    }
   };
 
   const completeOnboarding = () => {
@@ -350,8 +369,7 @@ export const AppProvider = ({ children }) => {
         setCompletedMalas,
         incrementTodayCount,
         recordChant,
-        streakCount,
-        setStreakCount,
+        activeDates,
         recentSessions,
         setRecentSessions: setRecentSessionsState,
         addJaapSession,

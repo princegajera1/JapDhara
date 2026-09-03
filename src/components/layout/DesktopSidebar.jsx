@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { NavLink } from 'react-router-dom';
 import {
   Home,
@@ -12,9 +12,7 @@ import {
   Bell,
   User,
   Settings,
-  Download,
 } from 'lucide-react';
-import InstallModal from '../common/InstallModal';
 
 const NAV_ITEMS = [
   { path: '/home', label: 'Home', icon: Home },
@@ -31,8 +29,6 @@ const NAV_ITEMS = [
 ];
 
 export const DesktopSidebar = () => {
-  const [isInstallModalOpen, setIsInstallModalOpen] = useState(false);
-
   return (
     <aside className="hidden lg:flex flex-col w-64 shrink-0 border-r border-light-border dark:border-dark-border bg-light-card/50 dark:bg-dark-card/50 p-4 min-h-[calc(100vh-61px)] justify-between">
       <nav className="space-y-1 overflow-y-auto pr-1">
@@ -62,26 +58,13 @@ export const DesktopSidebar = () => {
         })}
       </nav>
 
-      {/* Dedicated Action Footer */}
-      <div className="pt-4 border-t border-light-border dark:border-dark-border space-y-2.5 shrink-0 mt-4">
-        <button
-          onClick={() => setIsInstallModalOpen(true)}
-          className="w-full flex items-center justify-center gap-2 px-3.5 py-2.5 rounded-xl border border-spiritual-500/30 bg-spiritual-500/10 hover:bg-spiritual-500/20 text-spiritual-600 dark:text-spiritual-400 font-semibold text-xs transition-colors cursor-pointer"
-        >
-          <Download className="w-4 h-4 shrink-0" />
-          <span>Download App (PWA)</span>
-        </button>
-
+      {/* Clean Footer */}
+      <div className="pt-4 border-t border-light-border dark:border-dark-border shrink-0 mt-4">
         <div className="p-3 rounded-2xl bg-light-hover/40 dark:bg-dark-hover/40 text-center">
           <p className="text-xs font-bold text-spiritual-500">JapDhara v1.0</p>
           <p className="text-[10px] text-light-muted dark:text-dark-muted mt-0.5">Let your Jaap flow.</p>
         </div>
       </div>
-
-      <InstallModal
-        isOpen={isInstallModalOpen}
-        onClose={() => setIsInstallModalOpen(false)}
-      />
     </aside>
   );
 };

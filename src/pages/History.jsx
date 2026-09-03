@@ -20,21 +20,28 @@ export const History = () => {
       title: s.mantraTitle || 'Om Namah Shivaya',
       subtext: s.sanskrit || 'ॐ नमः शिवाय',
       countText: `${s.count} chants`,
-      malasCount: Math.floor((s.count || 0) / 108),
+      malasCount: s.count >= 108 ? Math.floor(s.count / 108) : 0,
       date: s.date || 'Recent',
       rawDate: new Date(s.timestamp || s.date || Date.now()).getTime(),
     }));
 
-    const meditationItems = meditationHistory.map((m) => ({
-      id: `meditation-${m.id || Math.random()}`,
-      type: 'Meditation',
-      title: m.mode || 'Silent Meditation',
-      subtext: `${m.durationMinutes} minutes session`,
-      countText: `${m.durationMinutes} mins`,
-      malasCount: 0,
-      date: m.date || 'Recent',
-      rawDate: new Date(m.timestamp || m.date || Date.now()).getTime(),
-    }));
+    const meditationItems = meditationHistory.map((m) => {
+      const durationLabel =
+        m.durationSeconds && m.durationSeconds < 60
+          ? `${m.durationSeconds} sec`
+          : `${m.durationMinutes} min`;
+
+      return {
+        id: `meditation-${m.id || Math.random()}`,
+        type: 'Meditation',
+        title: m.mode || 'Silent Meditation',
+        subtext: `${durationLabel} completed session`,
+        countText: durationLabel,
+        malasCount: 0,
+        date: m.date || 'Recent',
+        rawDate: new Date(m.timestamp || m.date || Date.now()).getTime(),
+      };
+    });
 
     const merged = [...jaapItems, ...meditationItems];
     merged.sort((a, b) => b.rawDate - a.rawDate);
