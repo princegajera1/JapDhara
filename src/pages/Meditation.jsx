@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import {
   Play,
   Pause,
@@ -14,6 +14,9 @@ import {
   Clock,
   BookOpen,
   History,
+  Music,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react';
 
 import PageHeader from '../components/common/PageHeader';
@@ -22,6 +25,25 @@ import Button from '../components/ui/Button';
 import Toast from '../components/common/Toast';
 import EmptyState from '../components/common/EmptyState';
 import useApp from '../hooks/useApp';
+import storage from '../utils/storage';
+import {
+  startAmbientAudio,
+  stopAmbientAudio,
+  updateAmbientVolume,
+  playCompletionBell,
+} from '../utils/meditationAudio';
+
+const STORAGE_KEY_AUDIO = 'japdhara_meditation_audio';
+
+const DEFAULT_AUDIO_SETTINGS = {
+  soundEnabled: true,
+  selectedSound: 'river',
+  soundVolume: 0.6,
+  reverbEnabled: true,
+  reverbAmount: 0.5,
+  completionBellEnabled: true,
+  completionBellVolume: 0.8,
+};
 
 const DURATIONS = [
   { label: '5 min', minutes: 5 },
@@ -61,26 +83,40 @@ const MODES = [
 export const Meditation = () => {
   const navigate = useNavigate();
   const {
+    t,
     currentMantra,
     meditationHistory,
     addMeditationSession,
   } = useApp();
 
-  const [selectedDuration, setSelectedDuration] = useState(5); // in minutes
+  const [selectedDuration, setSelectedDuration] = useState(5); // minutes
   const [selectedMode, setSelectedMode] = useState(MODES[0]);
-  const [timeLeft, setTimeLeft] = useState(5 * 60); // in seconds
+  const [timeLeft, setTimeLeft] = useState(5 * 60); // seconds
   const [isRunning, setIsRunning] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
   const [showCompletionToast, setShowCompletionToast] = useState(false);
-  const [soundEnabled, setSoundEnabled] = useState(true);
+
+  // Audio Configuration State (Persisted)
+  const [audioSettings, setAudioSettings] = useState(() =>
+    storage.getItem(STORAGE_KEY_AUDIO, DEFAULT_AUDIO_SETTINGS)
+  );
+
+  const [isAudioPanelOpen, setIsAudioPanelOpen] = useState(false);
 
   // Breathing cycle phase for Breath Focus mode
   const [breathPhase, setBreathPhase] = useState('Inhale');
 
   const timerRef = useRef(null);
-  const startTimeRef = useRef(null);
+  const endTimeRef = useRef(null);
+  const pausedTimeLeftRef = useRef(null);
+  const hasPlayedCompletionRef = useRef(false);
 
-  // Sync initial time when user picks duration (and not currently running)
+  // Persist Audio Settings
+  useEffect(() => {
+    storage.setItem(STORAGE_KEY_AUDIO, audioSettings);
+  }, [audioSettings]);
+
+  // Sync initial time when user picks duration (when not running)
   const handleSelectDuration = (minutes) => {
     if (isRunning) return;
     setSelectedDuration(minutes);
@@ -88,24 +124,43 @@ export const Meditation = () => {
     setIsPaused(false);
   };
 
-  // Timer countdown effect
+  // Dynamic Volume update during active session
+  useEffect(() => {
+    if (isRunning && !isPaused && audioSettings.soundEnabled) {
+      updateAmbientVolume(audioSettings.soundVolume);
+    }
+  }, [audioSettings.soundVolume, isRunning, isPaused, audioSettings.soundEnabled]);
+
+  // Accurate Timestamp-Based Timer Engine
   useEffect(() => {
     if (isRunning && !isPaused) {
+      if (!endTimeRef.current) {
+        const remainingMs = (pausedTimeLeftRef.current !== null ? pausedTimeLeftRef.current : timeLeft) * 1000;
+        endTimeRef.current = Date.now() + remainingMs;
+      }
+
       timerRef.current = setInterval(() => {
-        setTimeLeft((prev) => {
-          if (prev <= 1) {
-            clearInterval(timerRef.current);
-            handleCompleteSession(selectedDuration * 60);
-            return 0;
-          }
-          return prev - 1;
-        });
-      }, 1000);
+        const now = Date.now();
+        const diffMs = endTimeRef.current - now;
+        const remainingSecs = Math.max(0, Math.ceil(diffMs / 1000));
+
+        setTimeLeft(remainingSecs);
+
+        if (remainingSecs <= 0) {
+          clearInterval(timerRef.current);
+          endTimeRef.current = null;
+          pausedTimeLeftRef.current = null;
+          handleCompleteSession(selectedDuration * 60, true);
+        }
+      }, 250);
     } else {
-      clearInterval(timerRef.current);
+      if (timerRef.current) clearInterval(timerRef.current);
+      endTimeRef.current = null;
     }
 
-    return () => clearInterval(timerRef.current);
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current);
+    };
   }, [isRunning, isPaused, selectedDuration]);
 
   // Breathing cycle timer for Breath Focus mode
@@ -130,63 +185,90 @@ export const Meditation = () => {
     return () => clearInterval(interval);
   }, [selectedMode, isRunning, isPaused]);
 
-  // Play Web Audio API chime bell on completion or start
-  const playChimeSound = () => {
-    if (!soundEnabled) return;
-    try {
-      const AudioCtx = window.AudioContext || window.webkitAudioContext;
-      if (!AudioCtx) return;
-      const ctx = new AudioCtx();
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-
-      osc.type = 'sine';
-      osc.frequency.setValueAtTime(432, ctx.currentTime); // 432 Hz healing tone
-      gain.gain.setValueAtTime(0.3, ctx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 2.5);
-
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-      osc.start();
-      osc.stop(ctx.currentTime + 2.5);
-    } catch (e) {
-      // Silently handle if audio context is blocked
-    }
-  };
+  // Handle Page Visibility Changes (App Background/Tab Change)
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.hidden && isRunning && !isPaused) {
+        // Continue tracking elapsed time accurately via endTimeRef
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, [isRunning, isPaused]);
 
   const handleStartTimer = () => {
+    hasPlayedCompletionRef.current = false;
+    const initialSecs = selectedDuration * 60;
+    setTimeLeft(initialSecs);
+    pausedTimeLeftRef.current = initialSecs;
+    endTimeRef.current = Date.now() + initialSecs * 1000;
     setIsRunning(true);
     setIsPaused(false);
-    startTimeRef.current = Date.now();
-    playChimeSound();
+
+    // Start Ambient Sound
+    if (audioSettings.soundEnabled && audioSettings.selectedSound !== 'silent') {
+      startAmbientAudio({
+        soundType: audioSettings.selectedSound,
+        volume: audioSettings.soundVolume,
+        reverbEnabled: audioSettings.reverbEnabled,
+        reverbAmount: audioSettings.reverbAmount,
+      });
+    }
   };
 
   const handlePauseTimer = () => {
     setIsPaused(true);
+    pausedTimeLeftRef.current = timeLeft;
+    endTimeRef.current = null;
+    stopAmbientAudio();
   };
 
   const handleResumeTimer = () => {
     setIsPaused(false);
+    endTimeRef.current = Date.now() + (pausedTimeLeftRef.current || timeLeft) * 1000;
+
+    if (audioSettings.soundEnabled && audioSettings.selectedSound !== 'silent') {
+      startAmbientAudio({
+        soundType: audioSettings.selectedSound,
+        volume: audioSettings.soundVolume,
+        reverbEnabled: audioSettings.reverbEnabled,
+        reverbAmount: audioSettings.reverbAmount,
+      });
+    }
   };
 
   const handleResetTimer = () => {
     setIsRunning(false);
     setIsPaused(false);
+    stopAmbientAudio();
+    pausedTimeLeftRef.current = null;
+    endTimeRef.current = null;
     setTimeLeft(selectedDuration * 60);
-    clearInterval(timerRef.current);
+    if (timerRef.current) clearInterval(timerRef.current);
   };
 
   const handleEndSession = () => {
     const totalTargetSecs = selectedDuration * 60;
     const elapsedSecs = Math.max(1, totalTargetSecs - timeLeft);
-    handleCompleteSession(elapsedSecs);
+    handleCompleteSession(elapsedSecs, false);
   };
 
-  const handleCompleteSession = (elapsedSecs) => {
+  const handleCompleteSession = (elapsedSecs, isNaturalCompletion = false) => {
     setIsRunning(false);
     setIsPaused(false);
+    stopAmbientAudio();
+
+    if (timerRef.current) clearInterval(timerRef.current);
+    endTimeRef.current = null;
+    pausedTimeLeftRef.current = null;
+
     setShowCompletionToast(true);
-    playChimeSound();
+
+    // Play ONE peaceful completion bell if natural completion reached 00:00
+    if (isNaturalCompletion && audioSettings.completionBellEnabled && !hasPlayedCompletionRef.current) {
+      hasPlayedCompletionRef.current = true;
+      playCompletionBell(audioSettings.completionBellVolume);
+    }
 
     const actualSecs = elapsedSecs || Math.max(1, selectedDuration * 60 - timeLeft);
     const durationMinutes = Math.max(1, Math.round(actualSecs / 60));
@@ -200,6 +282,23 @@ export const Meditation = () => {
     setTimeLeft(selectedDuration * 60);
   };
 
+  const updateAudioState = (fields) => {
+    setAudioSettings((prev) => {
+      const next = { ...prev, ...fields };
+      if (isRunning && !isPaused && next.soundEnabled) {
+        startAmbientAudio({
+          soundType: next.selectedSound,
+          volume: next.soundVolume,
+          reverbEnabled: next.reverbEnabled,
+          reverbAmount: next.reverbAmount,
+        });
+      } else if (!next.soundEnabled || next.selectedSound === 'silent') {
+        stopAmbientAudio();
+      }
+      return next;
+    });
+  };
+
   // Format MM:SS
   const formatTime = (seconds) => {
     const mins = Math.floor(seconds / 60);
@@ -207,7 +306,7 @@ export const Meditation = () => {
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
-  // Format duration label (e.g. 2 sec or 5 min)
+  // Format duration display label
   const formatDurationDisplay = (seconds, minutes) => {
     if (seconds && seconds < 60) {
       return `${seconds} sec`;
@@ -228,7 +327,10 @@ export const Meditation = () => {
   }, [meditationHistory, todayKey]);
 
   const todayMinutes = useMemo(() => {
-    const totalSecs = todaySessions.reduce((acc, s) => acc + (s.durationSeconds || (s.durationMinutes * 60) || 0), 0);
+    const totalSecs = todaySessions.reduce(
+      (acc, s) => acc + (s.durationSeconds || s.durationMinutes * 60 || 0),
+      0
+    );
     return Math.round(totalSecs / 60);
   }, [todaySessions]);
 
@@ -247,29 +349,29 @@ export const Meditation = () => {
     <div className="space-y-6 max-w-2xl mx-auto pb-12">
       {/* Toast Notification for Completion */}
       <Toast
-        message="Meditation Recorded 🙏"
+        message={t('peacefulComplete') || 'Peaceful session complete 🙏'}
         type="success"
         isVisible={showCompletionToast}
         onClose={() => setShowCompletionToast(false)}
       />
 
       <PageHeader
-        title="Meditation"
+        title={t('meditation')}
         subtitle="Silent reflection, breath focus, and inner stillness."
         showBack
         onBack={() => navigate('/home')}
         action={
           <button
-            onClick={() => setSoundEnabled(!soundEnabled)}
-            className="p-2 rounded-xl border border-light-border dark:border-dark-border text-light-muted dark:text-dark-muted hover:text-spiritual-500 transition-colors"
-            aria-label={soundEnabled ? 'Mute ambient sound' : 'Unmute ambient sound'}
+            onClick={() => updateAudioState({ soundEnabled: !audioSettings.soundEnabled })}
+            className="p-2 rounded-xl border border-light-border dark:border-dark-border text-light-muted dark:text-dark-muted hover:text-spiritual-500 transition-colors cursor-pointer"
+            aria-label={audioSettings.soundEnabled ? 'Mute ambient sound' : 'Unmute ambient sound'}
           >
-            {soundEnabled ? <Volume2 className="w-5 h-5" /> : <VolumeX className="w-5 h-5" />}
+            {audioSettings.soundEnabled ? <Volume2 className="w-5 h-5" /> : <VolumeX className="w-5 h-5" />}
           </button>
         }
       />
 
-      {/* Main Timer Display & Breathing Container */}
+      {/* Main Timer Display Container */}
       <Card className="p-6 md:p-8 flex flex-col items-center justify-center text-center space-y-6 bg-gradient-to-b from-spiritual-500/5 via-transparent to-transparent border-spiritual-500/30">
         {/* Mode & Instruction Header */}
         <div className="space-y-1">
@@ -281,7 +383,7 @@ export const Meditation = () => {
           </p>
         </div>
 
-        {/* Mantra Mode Custom Visual Display */}
+        {/* Mantra Mode Custom Display */}
         {selectedMode.id === 'mantra' && (
           <div className="p-3 rounded-2xl bg-spiritual-500/10 border border-spiritual-500/20 max-w-xs w-full space-y-1">
             <span className="text-[10px] font-bold text-spiritual-600 dark:text-spiritual-400 uppercase">
@@ -294,7 +396,7 @@ export const Meditation = () => {
               to="/mantras"
               className="text-[11px] font-semibold text-spiritual-500 hover:underline block"
             >
-              Change Mantra
+              {t('changeMantra')}
             </Link>
           </div>
         )}
@@ -325,7 +427,7 @@ export const Meditation = () => {
           </div>
         )}
 
-        {/* Duration Selector Bar (Disabled when timer is active) */}
+        {/* Duration Selector Bar */}
         <div className="flex items-center justify-center gap-2 overflow-x-auto w-full max-w-md pb-1">
           {DURATIONS.map((dur) => {
             const isSelected = selectedDuration === dur.minutes;
@@ -334,7 +436,7 @@ export const Meditation = () => {
                 key={dur.minutes}
                 disabled={isRunning}
                 onClick={() => handleSelectDuration(dur.minutes)}
-                className={`px-3.5 py-1.5 rounded-full text-xs font-semibold transition-all ${
+                className={`px-3.5 py-1.5 rounded-full text-xs font-semibold transition-all cursor-pointer ${
                   isSelected
                     ? 'bg-spiritual-500 text-white shadow-soft-sm'
                     : 'bg-light-hover dark:bg-dark-hover text-light-muted dark:text-dark-muted hover:text-light-text dark:hover:text-dark-text disabled:opacity-50'
@@ -355,9 +457,9 @@ export const Meditation = () => {
               fullWidth
               icon={Play}
               onClick={handleStartTimer}
-              className="py-4 text-base font-semibold shadow-soft-md"
+              className="py-4 text-base font-semibold shadow-soft-md cursor-pointer"
             >
-              Start Meditation
+              {t('startMeditation')}
             </Button>
           ) : (
             <>
@@ -368,8 +470,9 @@ export const Meditation = () => {
                   fullWidth
                   icon={Play}
                   onClick={handleResumeTimer}
+                  className="cursor-pointer"
                 >
-                  Resume
+                  {t('resume')}
                 </Button>
               ) : (
                 <Button
@@ -378,8 +481,9 @@ export const Meditation = () => {
                   fullWidth
                   icon={Pause}
                   onClick={handlePauseTimer}
+                  className="cursor-pointer"
                 >
-                  Pause
+                  {t('pause')}
                 </Button>
               )}
 
@@ -388,10 +492,10 @@ export const Meditation = () => {
                 size="lg"
                 icon={Square}
                 onClick={handleEndSession}
-                className="w-auto px-4"
+                className="w-auto px-4 cursor-pointer"
                 ariaLabel="End meditation session"
               >
-                End
+                {t('end')}
               </Button>
             </>
           )}
@@ -402,12 +506,191 @@ export const Meditation = () => {
               size="icon"
               onClick={handleResetTimer}
               ariaLabel="Reset timer"
-              className="shrink-0"
+              className="shrink-0 cursor-pointer"
             >
               <RotateCcw className="w-5 h-5" />
             </Button>
           )}
         </div>
+      </Card>
+
+      {/* Premium Meditation Sound Collapsible Panel */}
+      <Card className="divide-y divide-light-border dark:divide-dark-border overflow-hidden">
+        <button
+          onClick={() => setIsAudioPanelOpen(!isAudioPanelOpen)}
+          className="w-full p-4 flex items-center justify-between hover:bg-light-hover dark:hover:bg-dark-hover transition-colors cursor-pointer text-left"
+        >
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 rounded-xl bg-spiritual-500/10 text-spiritual-500">
+              <Music className="w-5 h-5" />
+            </div>
+            <div>
+              <p className="font-bold text-sm text-light-text dark:text-dark-text">
+                🎵 {t('meditationSound')}
+              </p>
+              <p className="text-xs text-light-muted dark:text-dark-muted">
+                {audioSettings.soundEnabled && audioSettings.selectedSound !== 'silent'
+                  ? `Active: ${audioSettings.selectedSound}`
+                  : 'Silent Ambient'}
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <span
+              className={`text-xs font-extrabold px-2.5 py-0.5 rounded-full ${
+                audioSettings.soundEnabled
+                  ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400'
+                  : 'bg-light-hover dark:bg-dark-hover text-light-muted dark:text-dark-muted'
+              }`}
+            >
+              {audioSettings.soundEnabled ? t('on') : t('off')}
+            </span>
+            {isAudioPanelOpen ? (
+              <ChevronUp className="w-5 h-5 text-light-muted dark:text-dark-muted" />
+            ) : (
+              <ChevronDown className="w-5 h-5 text-light-muted dark:text-dark-muted" />
+            )}
+          </div>
+        </button>
+
+        <AnimatePresence>
+          {isAudioPanelOpen && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: 'auto', opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              transition={{ duration: 0.25, ease: 'easeInOut' }}
+              className="p-5 space-y-4 bg-light-card/40 dark:bg-dark-card/40"
+            >
+              {/* Sound Enabled Switch & Sound Selection Dropdown */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-light-muted dark:text-dark-muted uppercase tracking-wider">
+                    {t('sound')}
+                  </label>
+                  <select
+                    value={audioSettings.selectedSound}
+                    onChange={(e) => updateAudioState({ selectedSound: e.target.value })}
+                    className="w-full px-3.5 py-2 text-xs font-bold rounded-xl border border-light-border dark:border-dark-border bg-light-bg dark:bg-dark-bg focus:outline-none focus:ring-2 focus:ring-spiritual-500 cursor-pointer"
+                  >
+                    <option value="silent">{t('silent')}</option>
+                    <option value="river">{t('riverWater')}</option>
+                    <option value="rain">{t('gentleRain')}</option>
+                    <option value="forest">{t('forestBreeze')}</option>
+                    <option value="singing_bowl">{t('singingBowl')}</option>
+                    <option value="om_drone">{t('softOmDrone')}</option>
+                    <option value="ambient">{t('softAmbient')}</option>
+                  </select>
+                </div>
+
+                <div className="space-y-1.5">
+                  <div className="flex justify-between items-center text-xs font-bold">
+                    <span className="text-light-muted dark:text-dark-muted uppercase tracking-wider">
+                      {t('volume')}
+                    </span>
+                    <span className="text-spiritual-500">
+                      {Math.round(audioSettings.soundVolume * 100)}%
+                    </span>
+                  </div>
+                  <input
+                    type="range"
+                    min="0"
+                    max="1"
+                    step="0.05"
+                    value={audioSettings.soundVolume}
+                    onChange={(e) => updateAudioState({ soundVolume: parseFloat(e.target.value) })}
+                    className="w-full accent-spiritual-500 cursor-pointer"
+                  />
+                </div>
+              </div>
+
+              {/* Reverb Toggle & Intensity Slider */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 border-t border-light-border dark:border-dark-border">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs font-bold text-light-text dark:text-dark-text">{t('reverb')}</p>
+                    <p className="text-[11px] text-light-muted dark:text-dark-muted">Spiritual acoustics</p>
+                  </div>
+                  <button
+                    onClick={() => updateAudioState({ reverbEnabled: !audioSettings.reverbEnabled })}
+                    className={`px-3 py-1 text-xs font-bold rounded-full transition-colors cursor-pointer ${
+                      audioSettings.reverbEnabled
+                        ? 'bg-spiritual-500 text-white'
+                        : 'bg-light-hover dark:bg-dark-hover text-light-muted dark:text-dark-muted'
+                    }`}
+                  >
+                    {audioSettings.reverbEnabled ? t('on') : t('off')}
+                  </button>
+                </div>
+
+                <div className="space-y-1.5">
+                  <div className="flex justify-between items-center text-xs font-bold">
+                    <span className="text-light-muted dark:text-dark-muted uppercase tracking-wider">
+                      {t('reverbIntensity')}
+                    </span>
+                    <span className="text-spiritual-500">
+                      {audioSettings.reverbAmount < 0.4 ? t('low') : t('high')}
+                    </span>
+                  </div>
+                  <input
+                    type="range"
+                    min="0.1"
+                    max="0.9"
+                    step="0.1"
+                    disabled={!audioSettings.reverbEnabled}
+                    value={audioSettings.reverbAmount}
+                    onChange={(e) => updateAudioState({ reverbAmount: parseFloat(e.target.value) })}
+                    className="w-full accent-spiritual-500 cursor-pointer disabled:opacity-40"
+                  />
+                </div>
+              </div>
+
+              {/* Completion Bell Toggle & Volume */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 border-t border-light-border dark:border-dark-border">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs font-bold text-light-text dark:text-dark-text">{t('completionBell')}</p>
+                    <p className="text-[11px] text-light-muted dark:text-dark-muted">Chime at 00:00</p>
+                  </div>
+                  <button
+                    onClick={() =>
+                      updateAudioState({ completionBellEnabled: !audioSettings.completionBellEnabled })
+                    }
+                    className={`px-3 py-1 text-xs font-bold rounded-full transition-colors cursor-pointer ${
+                      audioSettings.completionBellEnabled
+                        ? 'bg-spiritual-500 text-white'
+                        : 'bg-light-hover dark:bg-dark-hover text-light-muted dark:text-dark-muted'
+                    }`}
+                  >
+                    {audioSettings.completionBellEnabled ? t('on') : t('off')}
+                  </button>
+                </div>
+
+                <div className="space-y-1.5">
+                  <div className="flex justify-between items-center text-xs font-bold">
+                    <span className="text-light-muted dark:text-dark-muted uppercase tracking-wider">
+                      {t('bellVolume')}
+                    </span>
+                    <span className="text-spiritual-500">
+                      {Math.round(audioSettings.completionBellVolume * 100)}%
+                    </span>
+                  </div>
+                  <input
+                    type="range"
+                    min="0.1"
+                    max="1"
+                    step="0.05"
+                    disabled={!audioSettings.completionBellEnabled}
+                    value={audioSettings.completionBellVolume}
+                    onChange={(e) => updateAudioState({ completionBellVolume: parseFloat(e.target.value) })}
+                    className="w-full accent-spiritual-500 cursor-pointer disabled:opacity-40"
+                  />
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </Card>
 
       {/* Meditation Modes Picker */}
@@ -424,7 +707,7 @@ export const Meditation = () => {
                 key={mode.id}
                 disabled={isRunning}
                 onClick={() => setSelectedMode(mode)}
-                className={`p-3 rounded-2xl border text-center flex flex-col items-center justify-center space-y-1.5 transition-all ${
+                className={`p-3 rounded-2xl border text-center flex flex-col items-center justify-center space-y-1.5 transition-all cursor-pointer ${
                   isSelected
                     ? 'border-spiritual-500 bg-spiritual-500/10 text-spiritual-600 dark:text-spiritual-400 font-bold shadow-soft-sm'
                     : 'border-light-border dark:border-dark-border bg-light-card dark:bg-dark-card hover:bg-light-hover dark:hover:bg-dark-hover text-light-muted dark:text-dark-muted disabled:opacity-50'
