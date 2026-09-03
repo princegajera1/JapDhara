@@ -1,4 +1,4 @@
-const CACHE_NAME = 'japdhara-v3';
+const CACHE_NAME = 'japdhara-v5';
 const PRECACHE_ASSETS = [
   '/',
   '/index.html',
@@ -36,9 +36,7 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return;
 
-  const url = new URL(event.request.url);
-
-  // Handle SPA Document Navigation Requests (e.g. /jaap, /mala, /stats)
+  // Handle SPA Document Navigation Requests (e.g. /jaap, /mala, /stats, /settings, /calendar)
   if (event.request.mode === 'navigate') {
     event.respondWith(
       fetch(event.request)
@@ -62,7 +60,6 @@ self.addEventListener('fetch', (event) => {
   event.respondWith(
     caches.match(event.request).then((cachedResponse) => {
       if (cachedResponse) {
-        // Fetch background update for cache freshness
         fetch(event.request)
           .then((networkResponse) => {
             if (networkResponse && networkResponse.status === 200) {

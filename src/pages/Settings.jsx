@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Sun,
@@ -17,6 +17,8 @@ import {
   CheckCircle2,
   Globe,
   Image as ImageIcon,
+  Share,
+  PlusSquare,
 } from 'lucide-react';
 
 import PageHeader from '../components/common/PageHeader';
@@ -26,6 +28,7 @@ import Modal from '../components/common/Modal';
 import Toast from '../components/common/Toast';
 import useTheme from '../hooks/useTheme';
 import useApp from '../hooks/useApp';
+import usePWAInstall from '../hooks/usePWAInstall';
 import storage from '../utils/storage';
 import { playSpiritualSound } from '../utils/audioUtils';
 import { triggerHaptic } from '../utils/hapticUtils';
@@ -65,46 +68,18 @@ export const Settings = () => {
     meditationHistory,
   } = useApp();
 
+  const { isInstalled, canInstall, isIOS, promptInstall } = usePWAInstall();
+
   const [isClearModalOpen, setIsClearModalOpen] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
   const [toastType, setToastType] = useState('info');
-  const [deferredPrompt, setDeferredPrompt] = useState(null);
-  const [isInstalled, setIsInstalled] = useState(false);
 
-  useEffect(() => {
-    const handleBeforeInstallPrompt = (e) => {
-      e.preventDefault();
-      setDeferredPrompt(e);
-    };
-
-    const handleAppInstalled = () => {
-      setIsInstalled(true);
-      setDeferredPrompt(null);
-    };
-
-    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
-    window.addEventListener('appinstalled', handleAppInstalled);
-
-    return () => {
-      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
-      window.removeEventListener('appinstalled', handleAppInstalled);
-    };
-  }, []);
-
-  const handleInstallPWA = async () => {
-    if (!deferredPrompt) {
-      setToastType('info');
-      setToastMessage('To install: In Chrome select "Install App", or Safari tap "Share -> Add to Home Screen".');
-      return;
-    }
-    deferredPrompt.prompt();
-    const { outcome } = await deferredPrompt.userChoice;
-    if (outcome === 'accepted') {
-      setIsInstalled(true);
+  const handleNativeInstall = async () => {
+    const res = await promptInstall();
+    if (res.success) {
       setToastType('success');
-      setToastMessage('JapDhara installed successfully!');
+      setToastMessage('✓ JapDhara installed successfully');
     }
-    setDeferredPrompt(null);
   };
 
   const handleCustomWallpaperUpload = (e) => {
@@ -280,37 +255,98 @@ export const Settings = () => {
         <h3 className="text-xs font-semibold uppercase tracking-wider text-light-muted dark:text-dark-muted">
           App Installation
         </h3>
-        <Card className="p-5 bg-gradient-to-r from-spiritual-500/15 via-spiritual-500/5 to-transparent border-spiritual-500/40 space-y-4">
-          <div className="flex items-center justify-between">
+
+        {/* Priority 1: App Already Installed */}
+        {isInstalled ? (
+          <Card className="p-5 bg-gradient-to-r from-emerald-500/15 via-emerald-500/5 to-transparent border-emerald-500/40 space-y-2">
             <div className="flex items-center gap-3.5">
-              <div className="p-3 rounded-2xl bg-spiritual-500/20 text-spiritual-500">
-                <Smartphone className="w-5 h-5" />
+              <div className="p-3 rounded-2xl bg-emerald-500/20 text-emerald-500">
+                <CheckCircle2 className="w-6 h-6" />
               </div>
               <div>
-                <p className="font-bold text-sm">Install JapDhara PWA</p>
+                <p className="font-bold text-base text-emerald-600 dark:text-emerald-400">
+                  JapDhara Installed ✓
+                </p>
                 <p className="text-xs text-light-muted dark:text-dark-muted mt-0.5">
-                  Status:{' '}
-                  <span className="font-bold text-spiritual-500">
-                    {isInstalled ? 'Installed ✓' : 'Not Installed'}
-                  </span>
+                  Your spiritual practice is ready anytime on your home screen.
+                </p>
+              </div>
+            </div>
+          </Card>
+        ) : canInstall ? (
+          /* Priority 2: Real Native Direct In-App Install Prompt Available */
+          <Card className="p-6 bg-gradient-to-r from-spiritual-500/15 via-spiritual-500/5 to-transparent border-spiritual-500/40 space-y-4">
+            <div className="flex items-start gap-4">
+              <div className="p-3 rounded-2xl bg-spiritual-500/20 text-spiritual-500 shrink-0">
+                <Smartphone className="w-6 h-6" />
+              </div>
+              <div className="space-y-1">
+                <h4 className="font-bold text-base">Install JapDhara</h4>
+                <p className="text-xs text-light-muted dark:text-dark-muted leading-relaxed">
+                  Keep your daily Jaap just one tap away. Fast, focused & offline-ready.
                 </p>
               </div>
             </div>
 
-            {!isInstalled && (
-              <Button variant="primary" size="sm" onClick={handleInstallPWA}>
-                Install App
+            <div className="pt-2 flex flex-col sm:flex-row items-center justify-between gap-3">
+              <Button
+                variant="primary"
+                size="md"
+                onClick={handleNativeInstall}
+                className="w-full sm:w-auto px-6 py-2.5 text-sm font-bold shadow-glow-accent cursor-pointer"
+              >
+                Install JapDhara
               </Button>
-            )}
-          </div>
-
-          {!isInstalled && (
-            <div className="text-xs text-light-muted dark:text-dark-muted leading-relaxed pt-2 border-t border-spiritual-500/20 space-y-1">
-              <p>• <strong>Chrome / Android:</strong> Tap &ldquo;Install App&rdquo; above or use browser menu.</p>
-              <p>• <strong>iPhone / Safari:</strong> Tap Share button &rarr; &ldquo;Add to Home Screen&rdquo;.</p>
+              <span className="text-[11px] font-semibold text-light-muted dark:text-dark-muted">
+                Free • Secure • No account required
+              </span>
             </div>
-          )}
-        </Card>
+          </Card>
+        ) : isIOS ? (
+          /* Priority 3: iOS Safari Step-by-Step Card */
+          <Card className="p-5 border-spiritual-500/30 space-y-3">
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 rounded-xl bg-spiritual-500/10 text-spiritual-500">
+                <Share className="w-5 h-5" />
+              </div>
+              <div>
+                <p className="font-bold text-sm">Add JapDhara to Home Screen</p>
+                <p className="text-xs text-light-muted dark:text-dark-muted">
+                  Follow Safari steps below to install:
+                </p>
+              </div>
+            </div>
+            <div className="text-xs text-light-muted dark:text-dark-muted space-y-1.5 pt-2 border-t border-light-border dark:border-dark-border">
+              <p className="flex items-center gap-2">
+                <span className="w-5 h-5 rounded-full bg-spiritual-500/15 text-spiritual-500 font-bold flex items-center justify-center text-[10px]">1</span>
+                <span>Tap the <strong>Share</strong> button in Safari toolbar below</span>
+              </p>
+              <p className="flex items-center gap-2">
+                <span className="w-5 h-5 rounded-full bg-spiritual-500/15 text-spiritual-500 font-bold flex items-center justify-center text-[10px]">2</span>
+                <span>Scroll down and tap <strong>Add to Home Screen</strong> <PlusSquare className="w-3.5 h-3.5 inline ml-1" /></span>
+              </p>
+              <p className="flex items-center gap-2">
+                <span className="w-5 h-5 rounded-full bg-spiritual-500/15 text-spiritual-500 font-bold flex items-center justify-center text-[10px]">3</span>
+                <span>Tap <strong>Add</strong> in top right corner</span>
+              </p>
+            </div>
+          </Card>
+        ) : (
+          /* Priority 4: Other Browser / Standalone Check Pending */
+          <Card className="p-4 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 rounded-xl bg-spiritual-500/10 text-spiritual-500">
+                <Smartphone className="w-4 h-4" />
+              </div>
+              <div>
+                <p className="font-semibold text-sm">App Installation</p>
+                <p className="text-xs text-light-muted dark:text-dark-muted">
+                  To install: Open browser menu &rarr; &ldquo;Install App&rdquo; or &ldquo;Add to Home Screen&rdquo;
+                </p>
+              </div>
+            </div>
+          </Card>
+        )}
       </div>
 
       {/* 2. Language Section */}
