@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import {
   RotateCcw,
   ChevronDown,
@@ -17,6 +17,8 @@ import Toast from '../components/common/Toast';
 import useApp from '../hooks/useApp';
 import { INITIAL_MANTRAS } from '../data/mantras';
 import { getMalaProgressDetails, MALA_BEADS } from '../utils/malaUtils';
+import { playSpiritualSound } from '../utils/audioUtils';
+import { triggerHaptic } from '../utils/hapticUtils';
 
 export const Mala = () => {
   const navigate = useNavigate();
@@ -36,6 +38,7 @@ export const Mala = () => {
   const [showCelebration, setShowCelebration] = useState(false);
   const [celebrationText, setCelebrationText] = useState('1 Mala Complete 🙏');
   const [tapAnimation, setTapAnimation] = useState(false);
+  const [floatingItems, setFloatingItems] = useState([]);
 
   const prevCountRef = useRef(todayCount);
 
@@ -57,17 +60,28 @@ export const Mala = () => {
     return { x, y };
   };
 
-  const handleChantMala = () => {
+  const handleChantMala = (e) => {
+    if (e) e.stopPropagation();
+
     const prevCount = prevCountRef.current;
     const nextCount = todayCount + 1;
 
     recordChant(1);
 
-    // Trigger toast ONLY when crossing an exact multiple of 108 (e.g. 107 -> 108, 215 -> 216)
+    // Audio & Haptic Feedback
+    const soundType = settings?.soundType || (settings?.soundEnabled ? 'bead' : 'none');
+    playSpiritualSound(soundType, settings?.soundEnabled !== false);
+
+    const hapticIntensity = settings?.hapticIntensity || (settings?.vibrationEnabled ? 'light' : 'off');
+    triggerHaptic(hapticIntensity);
+
+    // Trigger completion celebration ONLY when crossing exact multiples of 108 (e.g. 107 -> 108, 215 -> 216)
     if (nextCount > 0 && nextCount % MALA_BEADS === 0 && prevCount % MALA_BEADS !== 0) {
       const malaNum = Math.floor(nextCount / MALA_BEADS);
       setCelebrationText(`${malaNum} Mala${malaNum > 1 ? 's' : ''} Complete 🙏`);
       setShowCelebration(true);
+      playSpiritualSound('temple_bell', settings?.soundEnabled !== false);
+      triggerHaptic('mala_complete');
       setTimeout(() => setShowCelebration(false), 3500);
     }
 
@@ -76,13 +90,8 @@ export const Mala = () => {
     setTapAnimation(true);
     setTimeout(() => setTapAnimation(false), 120);
 
-    if (settings?.vibrationEnabled && window.navigator?.vibrate) {
-      try {
-        window.navigator.vibrate(25);
-      } catch (err) {
-        // Suppress vibration errors
-      }
-    }
+    const newItem = { id: Date.now() + Math.random(), label: '+1' };
+    setFloatingItems((prev) => [...prev.slice(-4), newItem]);
   };
 
   useEffect(() => {
@@ -131,7 +140,13 @@ export const Mala = () => {
         }
       />
 
-      <Card className="p-4 flex items-center justify-between border-spiritual-500/20">
+      <Card
+        role="button"
+        tabIndex={0}
+        onClick={handleChantMala}
+        aria-label="Tap to count Jaap"
+        className="p-4 flex items-center justify-between border-spiritual-500/20 cursor-pointer touch-manipulation select-none active:scale-[0.99] transition-transform"
+      >
         <div className="space-y-0.5 text-left">
           <div className="flex items-center gap-1.5 text-xs text-spiritual-600 dark:text-spiritual-400 font-semibold uppercase tracking-wider">
             <Sparkles className="w-3.5 h-3.5" />
@@ -146,7 +161,10 @@ export const Mala = () => {
         <Button
           variant="secondary"
           size="sm"
-          onClick={() => setIsMantraModalOpen(true)}
+          onClick={(e) => {
+            e.stopPropagation();
+            setIsMantraModalOpen(true);
+          }}
           className="gap-1 shrink-0 text-xs"
         >
           <span>Change</span>
@@ -154,7 +172,30 @@ export const Mala = () => {
         </Button>
       </Card>
 
-      <Card className="p-4 sm:p-6 flex flex-col items-center justify-center text-center space-y-6 bg-gradient-to-b from-spiritual-500/5 via-transparent to-transparent border-spiritual-500/30 overflow-hidden">
+      <Card
+        role="button"
+        tabIndex={0}
+        onClick={handleChantMala}
+        aria-label="Sacred Mala interaction area: tap anywhere or tap any of the 108 beads to count Jaap"
+        className="p-4 sm:p-6 flex flex-col items-center justify-center text-center space-y-6 bg-gradient-to-b from-spiritual-500/5 via-transparent to-transparent border-spiritual-500/30 overflow-hidden cursor-pointer touch-manipulation select-none relative"
+      >
+        {/* Floating +1 Particles */}
+        <AnimatePresence>
+          {floatingItems.map((item) => (
+            <motion.span
+              key={item.id}
+              initial={{ opacity: 1, y: 0, scale: 0.9 }}
+              animate={{ opacity: 0, y: -50, scale: 1.2 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.8, ease: 'easeOut' }}
+              className="absolute text-spiritual-500 font-black text-xl pointer-events-none z-20"
+              style={{ top: '40%', left: '50%' }}
+            >
+              {item.label}
+            </motion.span>
+          ))}
+        </AnimatePresence>
+
         {showCelebration && (
           <motion.div
             initial={{ opacity: 0, scale: 0.95 }}
@@ -166,6 +207,7 @@ export const Mala = () => {
           </motion.div>
         )}
 
+        {/* 108 Sacred Bead Interactive SVG Ring */}
         <div className="relative w-full max-w-[270px] sm:max-w-[300px] aspect-square flex items-center justify-center">
           <svg viewBox="0 0 300 300" className="w-full h-full absolute inset-0">
             <circle
@@ -185,22 +227,32 @@ export const Mala = () => {
 
               if (isGuruBead) {
                 return (
-                  <g key={beadNum}>
+                  <g
+                    key={beadNum}
+                    onClick={handleChantMala}
+                    className="cursor-pointer touch-manipulation group"
+                  >
+                    <circle
+                      cx={x}
+                      cy={y}
+                      r="14"
+                      className="fill-transparent stroke-none pointer-events-auto"
+                    />
                     <circle
                       cx={x}
                       cy={y}
                       r={isCurrent ? '9' : '7.5'}
                       className={`transition-all duration-200 ${
                         isCurrent
-                          ? 'fill-spiritual-500 stroke-spiritual-300 stroke-2'
-                          : 'fill-spiritual-600 stroke-spiritual-400'
+                          ? 'fill-amber-500 stroke-amber-300 stroke-2 ring-4 ring-amber-500/40'
+                          : 'fill-spiritual-600 stroke-spiritual-400 group-hover:fill-amber-500'
                       }`}
                     />
                     <text
                       x={x}
                       y={y - 12}
                       textAnchor="middle"
-                      className="text-[10px] fill-spiritual-500 font-bold"
+                      className="text-[10px] fill-amber-500 font-bold select-none"
                     >
                       🕉 Guru
                     </text>
@@ -209,23 +261,36 @@ export const Mala = () => {
               }
 
               return (
-                <circle
+                <g
                   key={beadNum}
-                  cx={x}
-                  cy={y}
-                  r={isCurrent ? '5.5' : '3.5'}
-                  className={`transition-all duration-150 ${
-                    isCurrent
-                      ? 'fill-spiritual-500 stroke-spiritual-300 stroke-2 ring-2 ring-spiritual-500'
-                      : isPassed
-                      ? 'fill-spiritual-500/80'
-                      : 'fill-light-border dark:fill-dark-border'
-                  }`}
-                />
+                  onClick={handleChantMala}
+                  className="cursor-pointer touch-manipulation group"
+                >
+                  {/* Expanded Invisible Touch Target Overlay */}
+                  <circle
+                    cx={x}
+                    cy={y}
+                    r="8"
+                    className="fill-transparent stroke-none pointer-events-auto"
+                  />
+                  <circle
+                    cx={x}
+                    cy={y}
+                    r={isCurrent ? '6.5' : '4'}
+                    className={`transition-all duration-150 ${
+                      isCurrent
+                        ? 'fill-spiritual-500 stroke-spiritual-300 stroke-2 shadow-glow-accent'
+                        : isPassed
+                        ? 'fill-spiritual-500/80'
+                        : 'fill-light-border dark:fill-dark-border group-hover:fill-spiritual-400'
+                    }`}
+                  />
+                </g>
               );
             })}
           </svg>
 
+          {/* Sacred Center Count Display */}
           <div className="z-10 flex flex-col items-center justify-center space-y-0.5">
             <span className="text-[11px] font-bold uppercase tracking-wider text-spiritual-500">
               Current Mala
@@ -244,7 +309,8 @@ export const Mala = () => {
           </div>
         </div>
 
-        <div className="w-full max-w-xs space-y-2">
+        {/* Main Sacred Action Button */}
+        <div className="w-full max-w-xs space-y-2" onClick={(e) => e.stopPropagation()}>
           <motion.button
             onClick={handleChantMala}
             animate={{ scale: tapAnimation ? 0.94 : 1 }}
@@ -257,11 +323,11 @@ export const Mala = () => {
           </motion.button>
 
           <p className="text-[11px] text-light-muted dark:text-dark-muted font-medium">
-            Tap button or press <kbd className="px-1.5 py-0.5 rounded bg-light-hover dark:bg-dark-hover border border-light-border dark:border-dark-border text-xs">Spacebar</kbd>
+            Tap any of the 108 beads or press <kbd className="px-1.5 py-0.5 rounded bg-light-hover dark:bg-dark-hover border border-light-border dark:border-dark-border text-xs">Spacebar</kbd>
           </p>
         </div>
 
-        <div className="w-full space-y-4 pt-2 border-t border-light-border dark:border-dark-border">
+        <div className="w-full space-y-4 pt-2 border-t border-light-border dark:border-dark-border" onClick={(e) => e.stopPropagation()}>
           <div className="grid grid-cols-3 gap-2 text-center text-xs">
             <div className="p-2.5 rounded-xl bg-light-hover/50 dark:bg-dark-hover/50">
               <p className="text-[10px] text-light-muted dark:text-dark-muted uppercase font-medium">Current Bead</p>
@@ -338,7 +404,7 @@ export const Mala = () => {
                     setCurrentMantra(mantra);
                     setIsMantraModalOpen(false);
                   }}
-                  className={`w-full flex items-center justify-between p-3 rounded-2xl border text-left transition-all ${
+                  className={`w-full flex items-center justify-between p-3 rounded-2xl border text-left transition-all cursor-pointer ${
                     isSelected
                       ? 'border-spiritual-500 bg-spiritual-500/10 text-spiritual-600 dark:text-spiritual-400 font-semibold'
                       : 'border-light-border dark:border-dark-border hover:bg-light-hover dark:hover:bg-dark-hover'

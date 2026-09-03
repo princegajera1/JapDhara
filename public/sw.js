@@ -1,4 +1,4 @@
-const CACHE_NAME = 'japdhara-v5';
+const CACHE_NAME = 'japdhara-v6';
 const PRECACHE_ASSETS = [
   '/',
   '/index.html',
