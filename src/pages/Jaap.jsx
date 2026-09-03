@@ -36,6 +36,7 @@ export const Jaap = () => {
     currentMantra,
     setCurrentMantra,
     customMantras,
+    recordChant,
     addJaapSession,
     settings,
   } = useApp();
@@ -54,29 +55,34 @@ export const Jaap = () => {
   const percentage = Math.min(100, Math.round((todayCount / dailyGoal) * 100));
   const isGoalComplete = todayCount >= dailyGoal;
 
-  // Single tap/click handler that increments count by exactly 1
-  const handleChant = () => {
+  // Atomic single chant handler protected against rapid/double-tap events
+  const handleChant = (e) => {
+    if (e && e.type === 'touchstart') {
+      e.preventDefault(); // Prevent ghost click firing after touchstart
+    }
+
     if (!isSessionActive) {
       setIsSessionActive(true);
     }
 
-    setTodayCount(todayCount + 1);
+    // Atomic chant recorder updating Today Count, Bead Progress, Malas, and Session History
+    recordChant(1);
     setSessionCount((prev) => prev + 1);
 
     // Subtle tap animation feedback
     setTapAnimation(true);
-    setTimeout(() => setTapAnimation(false), 150);
+    setTimeout(() => setTapAnimation(false), 120);
 
     if (settings?.vibrationEnabled && window.navigator?.vibrate) {
       try {
         window.navigator.vibrate(25);
-      } catch (e) {
-        // Ignore vibration errors on unsupported devices
+      } catch (err) {
+        // Suppress errors on unsupported platforms
       }
     }
   };
 
-  // Keyboard accessibility: Spacebar or Enter increments count
+  // Keyboard accessibility: Spacebar increments count
   useEffect(() => {
     const handleKeyDown = (e) => {
       if (
@@ -101,7 +107,7 @@ export const Jaap = () => {
     }
   };
 
-  // Confirm Reset handler: resets today's count to 0
+  // Confirm Reset handler: resets today's count to 0 safely
   const handleConfirmReset = () => {
     setTodayCount(0);
     setSessionCount(0);
@@ -218,7 +224,7 @@ export const Jaap = () => {
                 key={todayCount}
                 initial={{ scale: 1.15 }}
                 animate={{ scale: 1 }}
-                transition={{ duration: 0.15 }}
+                transition={{ duration: 0.12 }}
                 className="block text-4xl md:text-5xl font-black tracking-tight text-light-text dark:text-dark-text"
               >
                 {todayCount}
@@ -237,6 +243,7 @@ export const Jaap = () => {
         <div className="w-full max-w-xs space-y-3">
           <motion.button
             onClick={handleChant}
+            onTouchStart={handleChant}
             animate={{ scale: tapAnimation ? 0.94 : 1 }}
             transition={{ duration: 0.1 }}
             className="w-full py-6 rounded-3xl bg-spiritual-500 hover:bg-spiritual-600 text-white font-bold text-xl md:text-2xl shadow-soft-lg hover:shadow-glow-accent flex items-center justify-center gap-3 transition-all duration-150 active:scale-95 cursor-pointer touch-manipulation focus:outline-none focus-visible:ring-4 focus-visible:ring-spiritual-500/50"

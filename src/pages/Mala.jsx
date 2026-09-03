@@ -17,6 +17,7 @@ import Modal from '../components/common/Modal';
 import Toast from '../components/common/Toast';
 import useApp from '../hooks/useApp';
 import { INITIAL_MANTRAS } from '../data/mantras';
+import { getMalaProgressDetails, MALA_BEADS } from '../utils/malaUtils';
 
 export const Mala = () => {
   const navigate = useNavigate();
@@ -25,104 +26,91 @@ export const Mala = () => {
     setTodayCount,
     currentMantra,
     setCurrentMantra,
-    currentBead,
-    setCurrentBead,
     completedMalas,
     setCompletedMalas,
     customMantras,
-    addJaapSession,
+    recordChant,
     settings,
   } = useApp();
 
   const [isResetModalOpen, setIsResetModalOpen] = useState(false);
   const [isMantraModalOpen, setIsMantraModalOpen] = useState(false);
   const [showCelebration, setShowCelebration] = useState(false);
+  const [celebrationText, setCelebrationText] = useState('1 Mala Complete 🙏');
   const [tapAnimation, setTapAnimation] = useState(false);
 
   const availableMantras = [...INITIAL_MANTRAS, ...customMantras];
 
+  // Derive exact mala & bead details from master todayCount
+  const { currentBead, completedMalas: calculatedMalas } = getMalaProgressDetails(todayCount);
+  const displayMalas = Math.max(completedMalas, calculatedMalas);
+
   // Generate 108 beads dynamically
-  const totalBeads = 108;
-  const beads = Array.from({ length: totalBeads }, (_, i) => i + 1);
+  const beads = Array.from({ length: MALA_BEADS }, (_, i) => i + 1);
 
   // Calculate angles for circular placement (starting at top -90deg)
   const getBeadCoordinates = (index, size = 300, radius = 125) => {
     const center = size / 2;
-    const angle = ((index / totalBeads) * 360 - 90) * (Math.PI / 180);
+    const angle = ((index / MALA_BEADS) * 360 - 90) * (Math.PI / 180);
     const x = center + radius * Math.cos(angle);
     const y = center + radius * Math.sin(angle);
     return { x, y };
   };
 
-  const handleChantMala = () => {
-    if (currentBead >= 108) {
+  const handleChantMala = (e) => {
+    if (e && e.type === 'touchstart') {
+      e.preventDefault();
+    }
+
+    const nextCount = todayCount + 1;
+    recordChant(1);
+
+    // Check if exactly completed a full 108 mala
+    if (nextCount % MALA_BEADS === 0 && nextCount > 0) {
+      const malaNum = Math.floor(nextCount / MALA_BEADS);
+      setCelebrationText(`${malaNum} Mala Complete 🙏`);
       setShowCelebration(true);
-      setCompletedMalas(completedMalas + 1);
-      setCurrentBead(1);
-      setTodayCount(todayCount + 1);
-
-      addJaapSession({
-        mantraTitle: currentMantra.title,
-        sanskrit: currentMantra.sanskrit,
-        count: 108,
-      });
-
       setTimeout(() => setShowCelebration(false), 3500);
-    } else {
-      setCurrentBead(currentBead + 1);
-      setTodayCount(todayCount + 1);
     }
 
     setTapAnimation(true);
-    setTimeout(() => setTapAnimation(false), 150);
+    setTimeout(() => setTapAnimation(false), 120);
 
     if (settings?.vibrationEnabled && window.navigator?.vibrate) {
       try {
         window.navigator.vibrate(25);
-      } catch (e) {
-        // Ignore vibration error on unsupported platforms
+      } catch (err) {
+        // Suppress vibration errors
       }
     }
   };
 
   useEffect(() => {
     const handleKeyDown = (e) => {
-      if (
-        e.code === 'Space' &&
-        !isResetModalOpen &&
-        !isMantraModalOpen
-      ) {
+      if (e.code === 'Space' && !isResetModalOpen && !isMantraModalOpen) {
         e.preventDefault();
         handleChantMala();
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [currentBead, todayCount, isResetModalOpen, isMantraModalOpen]);
+  }, [todayCount, isResetModalOpen, isMantraModalOpen]);
 
   const handleUndo = () => {
     if (todayCount > 0) {
       setTodayCount(todayCount - 1);
-      if (currentBead > 1) {
-        setCurrentBead(currentBead - 1);
-      } else if (completedMalas > 0) {
-        setCompletedMalas(completedMalas - 1);
-        setCurrentBead(108);
-      }
     }
   };
 
   const handleConfirmReset = () => {
-    setCurrentBead(1);
+    setTodayCount(0);
     setIsResetModalOpen(false);
   };
-
-  const currentMalaNumber = completedMalas + 1;
 
   return (
     <div className="space-y-6 max-w-xl mx-auto pb-12">
       <Toast
-        message="1 Mala Complete 🙏"
+        message={celebrationText}
         type="success"
         isVisible={showCelebration}
         onClose={() => setShowCelebration(false)}
@@ -176,7 +164,7 @@ export const Mala = () => {
             className="w-full p-3 rounded-2xl bg-spiritual-500/20 border border-spiritual-500/40 text-spiritual-600 dark:text-spiritual-400 font-bold text-sm flex items-center justify-center gap-2"
           >
             <Award className="w-5 h-5 text-spiritual-500" />
-            <span>1 Mala Complete 🙏 (Mala {completedMalas} Finished!)</span>
+            <span>{celebrationText}</span>
           </motion.div>
         )}
 
@@ -242,7 +230,7 @@ export const Mala = () => {
 
           <div className="z-10 flex flex-col items-center justify-center space-y-0.5">
             <span className="text-[11px] font-bold uppercase tracking-wider text-spiritual-500">
-              Mala {currentMalaNumber}
+              Mala {displayMalas + 1}
             </span>
             <span className="text-3xl font-black tracking-tight">
               {currentBead} <span className="text-sm font-normal text-light-muted dark:text-dark-muted">/ 108</span>
@@ -250,9 +238,9 @@ export const Mala = () => {
             <p className="text-xs font-semibold text-light-muted dark:text-dark-muted">
               Total: <span className="font-bold text-light-text dark:text-dark-text">{todayCount}</span> Jaap
             </p>
-            {completedMalas > 0 && (
+            {displayMalas > 0 && (
               <span className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full mt-1">
-                {completedMalas} Mala{completedMalas > 1 ? 's' : ''} Completed
+                {displayMalas} Mala{displayMalas > 1 ? 's' : ''} Completed
               </span>
             )}
           </div>
@@ -261,6 +249,7 @@ export const Mala = () => {
         <div className="w-full max-w-xs space-y-2">
           <motion.button
             onClick={handleChantMala}
+            onTouchStart={handleChantMala}
             animate={{ scale: tapAnimation ? 0.94 : 1 }}
             transition={{ duration: 0.1 }}
             className="w-full py-5 rounded-3xl bg-spiritual-500 hover:bg-spiritual-600 text-white font-bold text-xl shadow-soft-lg hover:shadow-glow-accent flex items-center justify-center gap-2.5 transition-all duration-150 active:scale-95 cursor-pointer touch-manipulation focus:outline-none focus-visible:ring-4 focus-visible:ring-spiritual-500/50"
@@ -287,7 +276,7 @@ export const Mala = () => {
             </div>
             <div className="p-2 rounded-xl bg-light-hover/50 dark:bg-dark-hover/50">
               <p className="text-[10px] text-light-muted dark:text-dark-muted uppercase font-medium">Completed</p>
-              <p className="font-bold text-emerald-600 dark:text-emerald-400">{completedMalas} Mala</p>
+              <p className="font-bold text-emerald-600 dark:text-emerald-400">{displayMalas} Mala</p>
             </div>
           </div>
 

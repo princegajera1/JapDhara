@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="japdharaGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#F59E0B"/>
+      <stop offset="50%" stop-color="#D97706"/>
+      <stop offset="100%" stop-color="#0D9488"/>
+    </linearGradient>
+    <linearGradient id="dharaFlow" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1E1B4B"/>
+      <stop offset="100%" stop-color="#111318"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="512" height="512" rx="128" fill="url(#dharaFlow)"/>
+  <circle cx="256" cy="256" r="216" fill="none" stroke="url(#japdharaGrad)" stroke-width="12"/>
+
+  <!-- Flowing Dhara Water Lines -->
+  <path d="M 96 336 Q 200 240 256 336 T 416 336" stroke="#0D9488" stroke-width="14" stroke-linecap="round" opacity="0.6"/>
+  <path d="M 72 384 Q 184 288 256 384 T 440 384" stroke="#F59E0B" stroke-width="12" stroke-linecap="round" opacity="0.5"/>
+
+  <!-- Sacred Om Symbol in Center -->
+  <text x="50%" y="56%" dominant-baseline="central" text-anchor="middle" fill="url(#japdharaGrad)" font-size="240" font-weight="bold" font-family="serif">🕉</text>
+  
+  <!-- Guru Bead Accent -->
+  <circle cx="256" cy="40" r="20" fill="#F59E0B"/>
+</svg>

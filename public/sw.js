@@ -1,11 +1,12 @@
-const CACHE_NAME = 'japdhara-cache-v1';
+const CACHE_NAME = 'japdhara-cache-v2';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
-  '/manifest.webmanifest'
+  '/manifest.webmanifest',
+  '/icon.svg'
 ];
 
-// Install Event - Pre-cache static app shell
+// Install Event - Pre-cache essential app shell assets
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
@@ -15,7 +16,7 @@ self.addEventListener('install', (event) => {
   self.skipWaiting();
 });
 
-// Activate Event - Clean up old caches
+// Activate Event - Clean up stale caches
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((keys) => {
@@ -31,7 +32,7 @@ self.addEventListener('activate', (event) => {
   self.clients.claim();
 });
 
-// Fetch Event - Network first with Cache fallback for app shell navigation
+// Fetch Event - Network first with Cache fallback for app shell navigation & assets
 self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return;
 

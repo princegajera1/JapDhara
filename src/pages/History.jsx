@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { History as HistoryIcon, CircleDot, Clock, Layers, Sparkles, Filter } from 'lucide-react';
+import { History as HistoryIcon, CircleDot, Clock, Layers, Filter } from 'lucide-react';
 import PageHeader from '../components/common/PageHeader';
 import Card from '../components/ui/Card';
 import EmptyState from '../components/common/EmptyState';
@@ -22,7 +22,7 @@ export const History = () => {
       countText: `${s.count} chants`,
       malasCount: Math.floor((s.count || 0) / 108),
       date: s.date || 'Recent',
-      rawDate: new Date(s.date || Date.now()).getTime(),
+      rawDate: new Date(s.timestamp || s.date || Date.now()).getTime(),
     }));
 
     const meditationItems = meditationHistory.map((m) => ({
@@ -31,6 +31,7 @@ export const History = () => {
       title: m.mode || 'Silent Meditation',
       subtext: `${m.durationMinutes} minutes session`,
       countText: `${m.durationMinutes} mins`,
+      malasCount: 0,
       date: m.date || 'Recent',
       rawDate: new Date(m.timestamp || m.date || Date.now()).getTime(),
     }));
@@ -43,6 +44,7 @@ export const History = () => {
   const filteredItems = useMemo(() => {
     if (activeFilter === 'Jaap') return combinedHistory.filter((i) => i.type === 'Jaap');
     if (activeFilter === 'Meditation') return combinedHistory.filter((i) => i.type === 'Meditation');
+    if (activeFilter === 'Mala') return combinedHistory.filter((i) => i.malasCount > 0);
     return combinedHistory;
   }, [combinedHistory, activeFilter]);
 
@@ -56,15 +58,15 @@ export const History = () => {
       />
 
       {/* Filter Tabs */}
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2 overflow-x-auto pb-1">
         <Filter className="w-4 h-4 text-light-muted dark:text-dark-muted shrink-0 ml-1" />
-        {['All', 'Jaap', 'Meditation'].map((filter) => {
+        {['All', 'Jaap', 'Meditation', 'Mala'].map((filter) => {
           const isSelected = activeFilter === filter;
           return (
             <button
               key={filter}
               onClick={() => setActiveFilter(filter)}
-              className={`px-4 py-2 rounded-full text-xs font-semibold transition-all cursor-pointer ${
+              className={`px-4 py-2 rounded-full text-xs font-semibold transition-all cursor-pointer whitespace-nowrap ${
                 isSelected
                   ? 'bg-spiritual-500 text-white shadow-soft-sm'
                   : 'bg-light-card dark:bg-dark-card border border-light-border dark:border-dark-border text-light-muted dark:text-dark-muted hover:text-light-text dark:hover:text-dark-text'
