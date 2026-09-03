@@ -14,6 +14,15 @@
   }
 }
 
+/* Safe Area Inset Helpers for Mobile Notched Devices */
+.pb-safe {
+  padding-bottom: max(0.75rem, env(safe-area-inset-bottom, 0px));
+}
+
+.pt-safe {
+  padding-top: max(0.75rem, env(safe-area-inset-top, 0px));
+}
+
 /* Custom scrollbars for clean minimal appearance */
 ::-webkit-scrollbar {
   width: 6px;

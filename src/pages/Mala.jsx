@@ -156,7 +156,7 @@ export const Mala = () => {
         </Button>
       </Card>
 
-      <Card className="p-6 flex flex-col items-center justify-center text-center space-y-6 bg-gradient-to-b from-spiritual-500/5 via-transparent to-transparent border-spiritual-500/30">
+      <Card className="p-4 sm:p-6 flex flex-col items-center justify-center text-center space-y-6 bg-gradient-to-b from-spiritual-500/5 via-transparent to-transparent border-spiritual-500/30 overflow-hidden">
         {showCelebration && (
           <motion.div
             initial={{ opacity: 0, scale: 0.95 }}
@@ -168,8 +168,8 @@ export const Mala = () => {
           </motion.div>
         )}
 
-        <div className="relative w-[300px] h-[300px] flex items-center justify-center">
-          <svg width="300" height="300" className="absolute inset-0">
+        <div className="relative w-full max-w-[270px] sm:max-w-[300px] aspect-square flex items-center justify-center">
+          <svg viewBox="0 0 300 300" className="w-full h-full absolute inset-0">
             <circle
               cx="150"
               cy="150"

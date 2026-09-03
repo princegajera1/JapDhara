@@ -14,7 +14,7 @@ export const MobileBottomNav = () => {
   return (
     <nav
       aria-label="Mobile Navigation"
-      className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-light-card/90 dark:bg-dark-card/90 backdrop-blur-md border-t border-light-border dark:border-dark-border px-2 py-1.5 shadow-lg transition-colors duration-200"
+      className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-light-card/90 dark:bg-dark-card/90 backdrop-blur-md border-t border-light-border dark:border-dark-border px-2 pt-1.5 pb-safe shadow-lg transition-colors duration-200"
     >
       <div className="flex items-center justify-around max-w-md mx-auto relative">
         {MOBILE_NAV_ITEMS.map((item) => {
