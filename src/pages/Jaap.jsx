@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import {
   RotateCcw,
   Plus,
@@ -22,6 +22,8 @@ import Button from '../components/ui/Button';
 import Modal from '../components/common/Modal';
 import useApp from '../hooks/useApp';
 import { INITIAL_MANTRAS } from '../data/mantras';
+import { playSpiritualSound } from '../utils/audioUtils';
+import { triggerHaptic } from '../utils/hapticUtils';
 
 const PRESET_GOALS = [108, 216, 324, 540, 1008, 1080];
 
@@ -37,6 +39,7 @@ export const Jaap = () => {
     customMantras,
     recordChant,
     addJaapSession,
+    completedMalas,
     settings,
   } = useApp();
 
@@ -48,36 +51,57 @@ export const Jaap = () => {
   const [customGoalInput, setCustomGoalInput] = useState('');
   const [isCustomGoal, setIsCustomGoal] = useState(false);
   const [tapAnimation, setTapAnimation] = useState(false);
+  const [floatingItems, setFloatingItems] = useState([]);
+
+  const prevCountRef = useRef(todayCount);
 
   const availableMantras = [...INITIAL_MANTRAS, ...customMantras];
+
+  // Bead calculations: completedMalas = Math.floor(todayCount / 108)
+  const currentBead = todayCount === 0 ? 0 : ((todayCount - 1) % 108) + 1;
+  const currentMalaCount = Math.floor(todayCount / 108);
 
   const percentage = Math.min(100, Math.round((todayCount / dailyGoal) * 100));
   const isGoalComplete = todayCount >= dailyGoal;
 
-  // Single reliable click handler - prevents duplicate touch+click double counting
-  const handleChant = () => {
+  // Single reliable click handler preventing mobile double counting
+  const handleChant = (e) => {
+    if (e) e.stopPropagation();
+
     if (!isSessionActive) {
       setIsSessionActive(true);
     }
 
-    // Atomic chant recorder updating Today Count, Bead Progress, Malas, and Session History
     recordChant(1);
     setSessionCount((prev) => prev + 1);
 
-    // Subtle tap animation feedback
+    // Audio & Haptic Feedback
+    const soundType = settings?.soundType || (settings?.soundEnabled ? 'bead' : 'none');
+    playSpiritualSound(soundType, settings?.soundEnabled !== false);
+
+    const hapticIntensity = settings?.hapticIntensity || (settings?.vibrationEnabled ? 'light' : 'off');
+    triggerHaptic(hapticIntensity);
+
+    // Visual Animation
     setTapAnimation(true);
     setTimeout(() => setTapAnimation(false), 120);
 
-    if (settings?.vibrationEnabled && window.navigator?.vibrate) {
-      try {
-        window.navigator.vibrate(25);
-      } catch (err) {
-        // Suppress errors on unsupported platforms
-      }
-    }
+    // Floating +1 particle animation
+    const newItem = { id: Date.now() + Math.random(), label: '+1' };
+    setFloatingItems((prev) => [...prev.slice(-4), newItem]);
   };
 
-  // Keyboard accessibility: Spacebar increments count safely
+  // Mala completion detection (e.g. 108, 216, 324)
+  useEffect(() => {
+    const prev = prevCountRef.current;
+    if (todayCount > 0 && todayCount % 108 === 0 && todayCount !== prev) {
+      playSpiritualSound('temple_bell', settings?.soundEnabled !== false);
+      triggerHaptic('mala_complete');
+    }
+    prevCountRef.current = todayCount;
+  }, [todayCount, settings]);
+
+  // Keyboard spacebar listener
   useEffect(() => {
     const handleKeyDown = (e) => {
       if (
@@ -92,9 +116,8 @@ export const Jaap = () => {
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [todayCount, isSessionActive, isResetModalOpen, isMantraModalOpen, isGoalModalOpen]);
+  }, [isResetModalOpen, isMantraModalOpen, isGoalModalOpen]);
 
-  // Confirm Reset handler: resets today's count to 0 safely
   const handleConfirmReset = () => {
     setTodayCount(0);
     setSessionCount(0);
@@ -102,7 +125,6 @@ export const Jaap = () => {
     setIsResetModalOpen(false);
   };
 
-  // Session start/stop behavior
   const handleToggleSession = () => {
     if (isSessionActive) {
       if (sessionCount > 0) {
@@ -137,8 +159,21 @@ export const Jaap = () => {
     }
   };
 
+  // Background style helper
+  const bgStyle = useMemo(() => {
+    const bgKey = settings?.jaapBackground || 'dark';
+    if (bgKey === 'custom' && settings?.customWallpaperUrl) {
+      return {
+        backgroundImage: `url(${settings.customWallpaperUrl})`,
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+      };
+    }
+    return {};
+  }, [settings]);
+
   return (
-    <div className="space-y-6 max-w-xl mx-auto pb-12">
+    <div style={bgStyle} className="space-y-6 max-w-xl mx-auto pb-12 rounded-3xl p-2 sm:p-4 transition-all">
       {/* Header & Quick Navigation Links */}
       <PageHeader
         title="Jaap Counter"
@@ -165,12 +200,18 @@ export const Jaap = () => {
         }
       />
 
-      {/* Active Mantra Selector Header */}
-      <Card className="p-4 flex items-center justify-between border-spiritual-500/20">
+      {/* Active Sacred Mantra Header (Tappable Center Area) */}
+      <Card
+        role="button"
+        tabIndex={0}
+        onClick={handleChant}
+        aria-label="Tap to count Jaap"
+        className="p-4 flex items-center justify-between border-spiritual-500/20 cursor-pointer touch-manipulation select-none active:scale-[0.99] transition-transform"
+      >
         <div className="space-y-0.5 text-left">
           <div className="flex items-center gap-1.5 text-xs text-spiritual-600 dark:text-spiritual-400 font-semibold uppercase tracking-wider">
             <Sparkles className="w-3.5 h-3.5" />
-            <span>Selected Mantra</span>
+            <span>Chanting Focus</span>
           </div>
           <h2 className="font-bold text-base md:text-lg">{currentMantra.title}</h2>
           <p className="mantra-text font-serif text-sm text-spiritual-500 font-medium">
@@ -181,7 +222,10 @@ export const Jaap = () => {
         <Button
           variant="secondary"
           size="sm"
-          onClick={() => setIsMantraModalOpen(true)}
+          onClick={(e) => {
+            e.stopPropagation();
+            setIsMantraModalOpen(true);
+          }}
           className="gap-1 shrink-0"
         >
           <span>Change</span>
@@ -189,8 +233,31 @@ export const Jaap = () => {
         </Button>
       </Card>
 
-      {/* Main Counter & Progress Ring Container */}
-      <Card className="p-6 md:p-8 flex flex-col items-center justify-center text-center space-y-6 bg-gradient-to-b from-spiritual-500/5 to-transparent border-spiritual-500/30">
+      {/* Main Sacred Center Interaction Area */}
+      <Card
+        role="button"
+        tabIndex={0}
+        onClick={handleChant}
+        aria-label="Sacred interaction area: tap anywhere to count Jaap"
+        className="p-6 md:p-8 flex flex-col items-center justify-center text-center space-y-6 bg-gradient-to-b from-spiritual-500/10 via-transparent to-transparent border-spiritual-500/30 cursor-pointer touch-manipulation select-none relative overflow-hidden"
+      >
+        {/* Floating +1 Particles */}
+        <AnimatePresence>
+          {floatingItems.map((item) => (
+            <motion.span
+              key={item.id}
+              initial={{ opacity: 1, y: 0, scale: 0.9 }}
+              animate={{ opacity: 0, y: -50, scale: 1.2 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.8, ease: 'easeOut' }}
+              className="absolute text-spiritual-500 font-black text-xl pointer-events-none z-20"
+              style={{ top: '40%', left: '50%' }}
+            >
+              {item.label}
+            </motion.span>
+          ))}
+        </AnimatePresence>
+
         {/* Goal Complete Banner */}
         {isGoalComplete && (
           <motion.div
@@ -199,11 +266,11 @@ export const Jaap = () => {
             className="w-full p-3 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 font-semibold text-sm flex items-center justify-center gap-2"
           >
             <CheckCircle2 className="w-5 h-5" />
-            <span>Daily Jaap Goal Complete 🙏</span>
+            <span>Daily Goal Complete 🙏 ({currentMalaCount} Mala Completed)</span>
           </motion.div>
         )}
 
-        {/* Circular Progress Ring with Center Counts */}
+        {/* Central Circular Sacred Display & 108 Bead Ring Indicator */}
         <div className="relative py-2">
           <ProgressRing value={Math.min(todayCount, dailyGoal)} max={dailyGoal} size={230} strokeWidth={12}>
             <div className="space-y-1">
@@ -217,7 +284,7 @@ export const Jaap = () => {
                 {todayCount}
               </motion.span>
               <p className="text-xs font-semibold text-light-muted dark:text-dark-muted">
-                Goal: <span className="text-spiritual-500 font-bold">{todayCount} / {dailyGoal}</span>
+                Bead: <span className="text-spiritual-500 font-bold">{currentBead} / 108</span>
               </p>
               <span className="inline-block text-[11px] font-bold text-spiritual-600 dark:text-spiritual-400 bg-spiritual-500/10 px-2.5 py-0.5 rounded-full mt-1">
                 {percentage}% Complete
@@ -226,8 +293,8 @@ export const Jaap = () => {
           </ProgressRing>
         </div>
 
-        {/* Main Circular Tap Button */}
-        <div className="w-full max-w-xs space-y-3">
+        {/* Main Sacred Action Button */}
+        <div className="w-full max-w-xs space-y-3" onClick={(e) => e.stopPropagation()}>
           <motion.button
             onClick={handleChant}
             animate={{ scale: tapAnimation ? 0.94 : 1 }}
@@ -235,17 +302,20 @@ export const Jaap = () => {
             className="w-full py-6 rounded-3xl bg-spiritual-500 hover:bg-spiritual-600 text-white font-bold text-xl md:text-2xl shadow-soft-lg hover:shadow-glow-accent flex items-center justify-center gap-3 transition-all duration-150 active:scale-95 cursor-pointer touch-manipulation focus:outline-none focus-visible:ring-4 focus-visible:ring-spiritual-500/50"
             aria-label="Count +1 Jaap"
           >
-            <span className="text-2xl">🙏</span>
+            <span className="text-2xl">🕉</span>
             <span>Jaap (+1)</span>
           </motion.button>
 
           <p className="text-[11px] text-light-muted dark:text-dark-muted font-medium">
-            Tap button or press <kbd className="px-1.5 py-0.5 rounded bg-light-hover dark:bg-dark-hover border border-light-border dark:border-dark-border text-xs">Spacebar</kbd> to count
+            Tap anywhere or press <kbd className="px-1.5 py-0.5 rounded bg-light-hover dark:bg-dark-hover border border-light-border dark:border-dark-border text-xs">Spacebar</kbd> to count
           </p>
         </div>
 
-        {/* Rebalanced Secondary Action Bar (No Undo Button) */}
-        <div className="grid grid-cols-3 gap-3 w-full pt-4 border-t border-light-border dark:border-dark-border">
+        {/* Rebalanced Action Bar */}
+        <div
+          className="grid grid-cols-3 gap-3 w-full pt-4 border-t border-light-border dark:border-dark-border"
+          onClick={(e) => e.stopPropagation()}
+        >
           <Button
             variant="secondary"
             size="sm"
@@ -353,7 +423,7 @@ export const Jaap = () => {
                     setCurrentMantra(mantra);
                     setIsMantraModalOpen(false);
                   }}
-                  className={`w-full flex items-center justify-between p-3 rounded-2xl border text-left transition-all ${
+                  className={`w-full flex items-center justify-between p-3 rounded-2xl border text-left transition-all cursor-pointer ${
                     isSelected
                       ? 'border-spiritual-500 bg-spiritual-500/10 text-spiritual-600 dark:text-spiritual-400 font-semibold'
                       : 'border-light-border dark:border-dark-border hover:bg-light-hover dark:hover:bg-dark-hover'
@@ -391,7 +461,7 @@ export const Jaap = () => {
                 <button
                   key={goal}
                   onClick={() => handleGoalSelect(goal)}
-                  className={`flex items-center justify-between p-3 rounded-xl border text-sm font-semibold transition-all ${
+                  className={`flex items-center justify-between p-3 rounded-xl border text-sm font-semibold transition-all cursor-pointer ${
                     isSelected
                       ? 'border-spiritual-500 bg-spiritual-500/15 text-spiritual-600 dark:text-spiritual-400'
                       : 'border-light-border dark:border-dark-border hover:bg-light-hover dark:hover:bg-dark-hover'
@@ -408,7 +478,7 @@ export const Jaap = () => {
             {!isCustomGoal ? (
               <button
                 onClick={() => setIsCustomGoal(true)}
-                className="text-xs font-semibold text-spiritual-500 hover:underline py-1"
+                className="text-xs font-semibold text-spiritual-500 hover:underline py-1 cursor-pointer"
               >
                 + Enter Custom Goal
               </button>

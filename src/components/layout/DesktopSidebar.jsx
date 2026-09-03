@@ -10,6 +10,7 @@ import {
   History,
   Trophy,
   Bell,
+  Calendar,
   User,
   Settings,
 } from 'lucide-react';
@@ -21,6 +22,7 @@ const NAV_ITEMS = [
   { path: '/mantras', label: 'Mantras', icon: BookOpen },
   { path: '/meditation', label: 'Meditation', icon: Sparkles },
   { path: '/stats', label: 'Statistics', icon: BarChart3 },
+  { path: '/calendar', label: 'Calendar', icon: Calendar },
   { path: '/history', label: 'History', icon: History },
   { path: '/achievements', label: 'Achievements', icon: Trophy },
   { path: '/reminders', label: 'Reminders', icon: Bell },

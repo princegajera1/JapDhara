@@ -15,6 +15,8 @@ import {
   Target,
   Smartphone,
   CheckCircle2,
+  Globe,
+  Image as ImageIcon,
 } from 'lucide-react';
 
 import PageHeader from '../components/common/PageHeader';
@@ -25,6 +27,25 @@ import Toast from '../components/common/Toast';
 import useTheme from '../hooks/useTheme';
 import useApp from '../hooks/useApp';
 import storage from '../utils/storage';
+import { playSpiritualSound } from '../utils/audioUtils';
+import { triggerHaptic } from '../utils/hapticUtils';
+
+const BACKGROUND_PRESETS = [
+  { id: 'dark', label: 'Dark Minimal', category: 'Minimal', color: '#121212' },
+  { id: 'black', label: 'Pure Black', category: 'Minimal', color: '#000000' },
+  { id: 'cream', label: 'Spiritual Cream', category: 'Minimal', color: '#FAF6F0' },
+  { id: 'saffron', label: 'Sacred Saffron', category: 'Minimal', color: '#FFF3E0' },
+  { id: 'shiva', label: 'Lord Shiva 🕉', category: 'Divine', color: '#1E293B' },
+  { id: 'ram', label: 'Lord Ram 🚩', category: 'Divine', color: '#7C2D12' },
+  { id: 'krishna', label: 'Lord Krishna 🦚', category: 'Divine', color: '#1E1B4B' },
+  { id: 'hanuman', label: 'Lord Hanuman 🙏', category: 'Divine', color: '#9A3412' },
+  { id: 'mata', label: 'Divine Mata 🌺', category: 'Divine', color: '#881337' },
+  { id: 'mountains', label: 'Himalayan Peaks', category: 'Nature', color: '#0F172A' },
+  { id: 'river', label: 'Sacred Ganges', category: 'Nature', color: '#064E3B' },
+  { id: 'sunrise', label: 'Morning Dawn', category: 'Nature', color: '#7C2D12' },
+  { id: 'temple', label: 'Temple Courtyard', category: 'Nature', color: '#451A03' },
+  { id: 'forest', label: 'Meditative Forest', category: 'Nature', color: '#14532D' },
+];
 
 export const Settings = () => {
   const navigate = useNavigate();
@@ -73,7 +94,7 @@ export const Settings = () => {
   const handleInstallPWA = async () => {
     if (!deferredPrompt) {
       setToastType('info');
-      setToastMessage('App is already installed or browser install prompt is unavailable.');
+      setToastMessage('To install: In Chrome select "Install App", or Safari tap "Share -> Add to Home Screen".');
       return;
     }
     deferredPrompt.prompt();
@@ -84,6 +105,27 @@ export const Settings = () => {
       setToastMessage('JapDhara installed successfully!');
     }
     setDeferredPrompt(null);
+  };
+
+  const handleCustomWallpaperUpload = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      setToastType('error');
+      setToastMessage('Image size exceeds 5MB limit.');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const dataUrl = event.target?.result;
+      if (dataUrl) {
+        updateSettings({ jaapBackground: 'custom', customWallpaperUrl: dataUrl });
+        setToastType('success');
+        setToastMessage('Custom wallpaper updated successfully!');
+      }
+    };
+    reader.readAsDataURL(file);
   };
 
   // Real JSON Data Export with version & backup metadata
@@ -134,10 +176,8 @@ export const Settings = () => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Reset input value so re-uploading same file triggers event
     const inputElement = e.target;
 
-    // File size check (Max 5MB)
     if (file.size > 5 * 1024 * 1024) {
       setToastType('error');
       setToastMessage('Backup file size exceeds 5MB limit.');
@@ -145,7 +185,6 @@ export const Settings = () => {
       return;
     }
 
-    // Extension / type check
     if (!file.name.endsWith('.json') && file.type && !file.type.includes('json')) {
       setToastType('error');
       setToastMessage('Invalid file type. Please upload a valid .json backup file.');
@@ -163,7 +202,6 @@ export const Settings = () => {
 
         const json = JSON.parse(text);
 
-        // Schema validation
         if (!json || typeof json !== 'object') {
           throw new Error('Invalid JSON format.');
         }
@@ -174,7 +212,6 @@ export const Settings = () => {
           throw new Error('No valid JapDhara data payload found.');
         }
 
-        // Restore keys into localStorage cleanly
         if (data.dailyGoal) storage.setItem('japdhara_daily_goal', data.dailyGoal);
         if (data.currentMantra) storage.setItem('japdhara_selected_mantra', data.currentMantra);
         if (data.profile) storage.setItem('japdhara_user_profile', data.profile);
@@ -211,7 +248,6 @@ export const Settings = () => {
     reader.readAsText(file);
   };
 
-  // Clear all JapDhara local data
   const handleClearAllData = () => {
     storage.clearAll();
     localStorage.removeItem('japdhara_onboarding_completed');
@@ -234,56 +270,208 @@ export const Settings = () => {
 
       <PageHeader
         title="Settings"
-        subtitle="Manage theme, preferences, sound, and data backup."
+        subtitle="Manage app installation, language, theme, audio, and backgrounds."
         showBack
         onBack={() => navigate('/home')}
       />
 
-      {/* PWA App Installation Option (if prompt is deferred) */}
-      {deferredPrompt && !isInstalled && (
-        <Card className="p-5 bg-gradient-to-r from-spiritual-500/15 via-spiritual-500/5 to-transparent border-spiritual-500/40 flex items-center justify-between">
-          <div className="flex items-center gap-3.5">
-            <div className="p-3 rounded-2xl bg-spiritual-500/20 text-spiritual-500">
-              <Smartphone className="w-5 h-5" />
-            </div>
-            <div>
-              <p className="font-bold text-sm">Install JapDhara App</p>
-              <p className="text-xs text-light-muted dark:text-dark-muted mt-0.5">
-                Install on your device home screen for fast offline access.
-              </p>
-            </div>
-          </div>
-          <Button variant="primary" size="sm" onClick={handleInstallPWA}>
-            Install
-          </Button>
-        </Card>
-      )}
-
-      {/* A. Appearance Section */}
+      {/* 1. App Installation Section */}
       <div className="space-y-3">
         <h3 className="text-xs font-semibold uppercase tracking-wider text-light-muted dark:text-dark-muted">
-          Appearance
+          App Installation
+        </h3>
+        <Card className="p-5 bg-gradient-to-r from-spiritual-500/15 via-spiritual-500/5 to-transparent border-spiritual-500/40 space-y-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3.5">
+              <div className="p-3 rounded-2xl bg-spiritual-500/20 text-spiritual-500">
+                <Smartphone className="w-5 h-5" />
+              </div>
+              <div>
+                <p className="font-bold text-sm">Install JapDhara PWA</p>
+                <p className="text-xs text-light-muted dark:text-dark-muted mt-0.5">
+                  Status:{' '}
+                  <span className="font-bold text-spiritual-500">
+                    {isInstalled ? 'Installed ✓' : 'Not Installed'}
+                  </span>
+                </p>
+              </div>
+            </div>
+
+            {!isInstalled && (
+              <Button variant="primary" size="sm" onClick={handleInstallPWA}>
+                Install App
+              </Button>
+            )}
+          </div>
+
+          {!isInstalled && (
+            <div className="text-xs text-light-muted dark:text-dark-muted leading-relaxed pt-2 border-t border-spiritual-500/20 space-y-1">
+              <p>• <strong>Chrome / Android:</strong> Tap &ldquo;Install App&rdquo; above or use browser menu.</p>
+              <p>• <strong>iPhone / Safari:</strong> Tap Share button &rarr; &ldquo;Add to Home Screen&rdquo;.</p>
+            </div>
+          )}
+        </Card>
+      </div>
+
+      {/* 2. Language Section */}
+      <div className="space-y-3">
+        <h3 className="text-xs font-semibold uppercase tracking-wider text-light-muted dark:text-dark-muted">
+          Language
         </h3>
         <Card className="p-4 flex items-center justify-between">
           <div className="flex items-center gap-3.5">
             <div className="p-3 rounded-2xl bg-spiritual-500/10 text-spiritual-500">
-              {theme === 'dark' ? <Moon className="w-5 h-5" /> : <Sun className="w-5 h-5" />}
+              <Globe className="w-5 h-5" />
             </div>
             <div>
-              <p className="font-bold text-sm">Theme Mode</p>
+              <p className="font-bold text-sm">App Language</p>
               <p className="text-xs text-light-muted dark:text-dark-muted mt-0.5">
-                Current mode: <span className="capitalize font-semibold text-spiritual-500">{theme}</span>
+                Select your preferred interface language
               </p>
             </div>
           </div>
 
-          <Button variant="secondary" size="sm" onClick={toggleTheme}>
-            Toggle Theme
-          </Button>
+          <select
+            value={settings?.language || 'en'}
+            onChange={(e) => updateSettings({ language: e.target.value })}
+            className="px-3 py-1.5 text-xs font-bold rounded-xl border border-light-border dark:border-dark-border bg-light-bg dark:bg-dark-bg focus:outline-none focus:ring-2 focus:ring-spiritual-500 cursor-pointer"
+          >
+            <option value="en">English</option>
+            <option value="gu">ગુજરાતી</option>
+            <option value="hi">हिन्दी</option>
+          </select>
         </Card>
       </div>
 
-      {/* B. Notifications Section */}
+      {/* 3. Appearance & Jaap Background */}
+      <div className="space-y-3">
+        <h3 className="text-xs font-semibold uppercase tracking-wider text-light-muted dark:text-dark-muted">
+          Appearance & Jaap Background
+        </h3>
+        <Card className="divide-y divide-light-border dark:divide-dark-border">
+          <div className="p-4 flex items-center justify-between">
+            <div className="flex items-center gap-3.5">
+              <div className="p-3 rounded-2xl bg-spiritual-500/10 text-spiritual-500">
+                {theme === 'dark' ? <Moon className="w-5 h-5" /> : <Sun className="w-5 h-5" />}
+              </div>
+              <div>
+                <p className="font-bold text-sm">Theme Mode</p>
+                <p className="text-xs text-light-muted dark:text-dark-muted mt-0.5">
+                  Current: <span className="capitalize font-semibold text-spiritual-500">{theme}</span>
+                </p>
+              </div>
+            </div>
+
+            <Button variant="secondary" size="sm" onClick={toggleTheme}>
+              Toggle Theme
+            </Button>
+          </div>
+
+          {/* Background Preset Picker */}
+          <div className="p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <ImageIcon className="w-4 h-4 text-spiritual-500" />
+                <p className="font-semibold text-sm">Jaap Screen Background</p>
+              </div>
+              <label className="text-xs font-bold text-spiritual-500 hover:underline cursor-pointer">
+                + Custom Wallpaper
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleCustomWallpaperUpload}
+                  className="hidden"
+                />
+              </label>
+            </div>
+
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1">
+              {BACKGROUND_PRESETS.map((preset) => {
+                const isSelected = (settings?.jaapBackground || 'dark') === preset.id;
+                return (
+                  <button
+                    key={preset.id}
+                    onClick={() => updateSettings({ jaapBackground: preset.id })}
+                    className={`p-2.5 rounded-xl border text-center text-xs font-semibold transition-all cursor-pointer ${
+                      isSelected
+                        ? 'border-spiritual-500 bg-spiritual-500/15 text-spiritual-600 dark:text-spiritual-400 font-bold ring-2 ring-spiritual-500/30'
+                        : 'border-light-border dark:border-dark-border hover:bg-light-hover dark:hover:bg-dark-hover'
+                    }`}
+                  >
+                    {preset.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </Card>
+      </div>
+
+      {/* 4. Sound & Haptic Feedback */}
+      <div className="space-y-3">
+        <h3 className="text-xs font-semibold uppercase tracking-wider text-light-muted dark:text-dark-muted">
+          Sound & Haptic Feedback
+        </h3>
+        <Card className="divide-y divide-light-border dark:divide-dark-border">
+          <div className="p-4 flex items-center justify-between">
+            <div className="flex items-center gap-3.5">
+              <div className="p-2.5 rounded-xl bg-spiritual-500/10 text-spiritual-500">
+                {settings?.soundType === 'none' ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
+              </div>
+              <div>
+                <p className="font-semibold text-sm">Chant Sound Effect</p>
+                <p className="text-xs text-light-muted dark:text-dark-muted">Web Audio chime on bead tap</p>
+              </div>
+            </div>
+
+            <select
+              value={settings?.soundType || 'bead'}
+              onChange={(e) => {
+                const val = e.target.value;
+                updateSettings({ soundType: val, soundEnabled: val !== 'none' });
+                playSpiritualSound(val, true);
+              }}
+              className="px-3 py-1.5 text-xs font-bold rounded-xl border border-light-border dark:border-dark-border bg-light-bg dark:bg-dark-bg focus:outline-none focus:ring-2 focus:ring-spiritual-500 cursor-pointer"
+            >
+              <option value="none">None</option>
+              <option value="soft_click">Soft Click</option>
+              <option value="bead">Wooden Bead</option>
+              <option value="bell">Crystal Chime</option>
+              <option value="temple_bell">Temple Bell</option>
+              <option value="om">Om Frequency</option>
+            </select>
+          </div>
+
+          <div className="p-4 flex items-center justify-between">
+            <div className="flex items-center gap-3.5">
+              <div className="p-2.5 rounded-xl bg-spiritual-500/10 text-spiritual-500">
+                <Vibrate className="w-4 h-4" />
+              </div>
+              <div>
+                <p className="font-semibold text-sm">Vibration Intensity</p>
+                <p className="text-xs text-light-muted dark:text-dark-muted">Device haptic feedback</p>
+              </div>
+            </div>
+
+            <select
+              value={settings?.hapticIntensity || 'light'}
+              onChange={(e) => {
+                const val = e.target.value;
+                updateSettings({ hapticIntensity: val, vibrationEnabled: val !== 'off' });
+                triggerHaptic(val);
+              }}
+              className="px-3 py-1.5 text-xs font-bold rounded-xl border border-light-border dark:border-dark-border bg-light-bg dark:bg-dark-bg focus:outline-none focus:ring-2 focus:ring-spiritual-500 cursor-pointer"
+            >
+              <option value="off">Off</option>
+              <option value="light">Light (10ms)</option>
+              <option value="medium">Medium (20ms)</option>
+              <option value="strong">Strong (40ms)</option>
+            </select>
+          </div>
+        </Card>
+      </div>
+
+      {/* 5. Notifications & Reminders Section */}
       <div className="space-y-3">
         <h3 className="text-xs font-semibold uppercase tracking-wider text-light-muted dark:text-dark-muted">
           Notifications & Reminders
@@ -297,7 +485,7 @@ export const Settings = () => {
               <p className="font-bold text-sm">Daily Chanting Reminders</p>
               <p className="text-xs text-light-muted dark:text-dark-muted mt-0.5">
                 {settings?.remindersEnabled
-                  ? `Scheduled daily at ${settings.reminderTime || '06:00'}`
+                  ? `Scheduled daily at ${settings.reminderTime || '06:00:00'}`
                   : 'Reminders disabled'}
               </p>
             </div>
@@ -309,7 +497,7 @@ export const Settings = () => {
         </Card>
       </div>
 
-      {/* C. Jaap Preferences Section */}
+      {/* 6. Jaap Preferences Section */}
       <div className="space-y-3">
         <h3 className="text-xs font-semibold uppercase tracking-wider text-light-muted dark:text-dark-muted">
           Jaap Preferences
@@ -347,51 +535,7 @@ export const Settings = () => {
         </Card>
       </div>
 
-      {/* D. Sound & Haptics Section */}
-      <div className="space-y-3">
-        <h3 className="text-xs font-semibold uppercase tracking-wider text-light-muted dark:text-dark-muted">
-          Sound & Feedback
-        </h3>
-        <Card className="divide-y divide-light-border dark:divide-dark-border">
-          <div className="p-4 flex items-center justify-between">
-            <div className="flex items-center gap-3.5">
-              <div className="p-2.5 rounded-xl bg-spiritual-500/10 text-spiritual-500">
-                {settings?.soundEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
-              </div>
-              <div>
-                <p className="font-semibold text-sm">Chant Sound Effects</p>
-                <p className="text-xs text-light-muted dark:text-dark-muted">Audio chime on completion</p>
-              </div>
-            </div>
-            <input
-              type="checkbox"
-              checked={settings?.soundEnabled || false}
-              onChange={(e) => updateSettings({ soundEnabled: e.target.checked })}
-              className="w-5 h-5 accent-spiritual-500 cursor-pointer"
-            />
-          </div>
-
-          <div className="p-4 flex items-center justify-between">
-            <div className="flex items-center gap-3.5">
-              <div className="p-2.5 rounded-xl bg-spiritual-500/10 text-spiritual-500">
-                <Vibrate className="w-4 h-4" />
-              </div>
-              <div>
-                <p className="font-semibold text-sm">Haptic Feedback</p>
-                <p className="text-xs text-light-muted dark:text-dark-muted">Vibrate on bead tap</p>
-              </div>
-            </div>
-            <input
-              type="checkbox"
-              checked={settings?.vibrationEnabled || false}
-              onChange={(e) => updateSettings({ vibrationEnabled: e.target.checked })}
-              className="w-5 h-5 accent-spiritual-500 cursor-pointer"
-            />
-          </div>
-        </Card>
-      </div>
-
-      {/* E. Data Management Section (Export / Import / Clear) */}
+      {/* 7. Data Backup & Management */}
       <div className="space-y-3">
         <h3 className="text-xs font-semibold uppercase tracking-wider text-light-muted dark:text-dark-muted">
           Data Backup & Management
@@ -436,7 +580,7 @@ export const Settings = () => {
         </Card>
       </div>
 
-      {/* F. About JapDhara Section */}
+      {/* 8. About JapDhara */}
       <div className="space-y-3">
         <h3 className="text-xs font-semibold uppercase tracking-wider text-light-muted dark:text-dark-muted">
           About JapDhara
