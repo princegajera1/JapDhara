@@ -11,7 +11,7 @@
     
     <!-- Open Graph Metadata -->
     <meta property="og:type" content="website" />
-    <meta property="og:title" content="JapDhara — Digital Jaap & Meditation" />
+    <meta property="og:title" content="JapDhara — Digital Jaap & Meditation (v1.2)" />
     <meta property="og:description" content="A peaceful journey of every chant. Track your daily Jaap, 108 digital mala, and meditation offline." />
     <meta property="og:image" content="/icon.svg" />
     
@@ -23,7 +23,20 @@
     <script>
       if ('serviceWorker' in navigator && window.location.protocol.startsWith('http')) {
         window.addEventListener('load', () => {
-          navigator.serviceWorker.register('/sw.js').catch((err) => {
+          navigator.serviceWorker.register('/sw.js').then((reg) => {
+            reg.addEventListener('updatefound', () => {
+              const newWorker = reg.installing;
+              if (newWorker) {
+                newWorker.addEventListener('statechange', () => {
+                  if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                    console.log('[PWA] New version JapDhara v1.2 available.');
+                  }
+                });
+              }
+            });
+            // Periodically check for updates
+            reg.update().catch(() => {});
+          }).catch((err) => {
             console.warn('[PWA] SW registration failed:', err);
           });
         });

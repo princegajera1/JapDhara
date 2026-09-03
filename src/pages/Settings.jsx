@@ -16,7 +16,6 @@ import {
   Smartphone,
   CheckCircle2,
   Globe,
-  Image as ImageIcon,
   Share,
   PlusSquare,
 } from 'lucide-react';
@@ -32,28 +31,13 @@ import usePWAInstall from '../hooks/usePWAInstall';
 import storage from '../utils/storage';
 import { playSpiritualSound } from '../utils/audioUtils';
 import { triggerHaptic } from '../utils/hapticUtils';
-
-const BACKGROUND_PRESETS = [
-  { id: 'dark', label: 'Dark Minimal', category: 'Minimal', color: '#121212' },
-  { id: 'black', label: 'Pure Black', category: 'Minimal', color: '#000000' },
-  { id: 'cream', label: 'Spiritual Cream', category: 'Minimal', color: '#FAF6F0' },
-  { id: 'saffron', label: 'Sacred Saffron', category: 'Minimal', color: '#FFF3E0' },
-  { id: 'shiva', label: 'Lord Shiva 🕉', category: 'Divine', color: '#1E293B' },
-  { id: 'ram', label: 'Lord Ram 🚩', category: 'Divine', color: '#7C2D12' },
-  { id: 'krishna', label: 'Lord Krishna 🦚', category: 'Divine', color: '#1E1B4B' },
-  { id: 'hanuman', label: 'Lord Hanuman 🙏', category: 'Divine', color: '#9A3412' },
-  { id: 'mata', label: 'Divine Mata 🌺', category: 'Divine', color: '#881337' },
-  { id: 'mountains', label: 'Himalayan Peaks', category: 'Nature', color: '#0F172A' },
-  { id: 'river', label: 'Sacred Ganges', category: 'Nature', color: '#064E3B' },
-  { id: 'sunrise', label: 'Morning Dawn', category: 'Nature', color: '#7C2D12' },
-  { id: 'temple', label: 'Temple Courtyard', category: 'Nature', color: '#451A03' },
-  { id: 'forest', label: 'Meditative Forest', category: 'Nature', color: '#14532D' },
-];
+import { APP_VERSION } from '../utils/constants';
 
 export const Settings = () => {
   const navigate = useNavigate();
   const { theme, toggleTheme } = useTheme();
   const {
+    t,
     settings,
     updateSettings,
     dailyGoal,
@@ -82,33 +66,12 @@ export const Settings = () => {
     }
   };
 
-  const handleCustomWallpaperUpload = (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    if (file.size > 5 * 1024 * 1024) {
-      setToastType('error');
-      setToastMessage('Image size exceeds 5MB limit.');
-      return;
-    }
-
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const dataUrl = event.target?.result;
-      if (dataUrl) {
-        updateSettings({ jaapBackground: 'custom', customWallpaperUrl: dataUrl });
-        setToastType('success');
-        setToastMessage('Custom wallpaper updated successfully!');
-      }
-    };
-    reader.readAsDataURL(file);
-  };
-
   // Real JSON Data Export with version & backup metadata
   const handleExportData = () => {
     try {
       const backupPayload = {
         app: 'JapDhara',
-        version: '1.0.0',
+        version: APP_VERSION,
         backupVersion: 1,
         exportedAt: new Date().toISOString(),
         data: {
@@ -244,8 +207,8 @@ export const Settings = () => {
       />
 
       <PageHeader
-        title="Settings"
-        subtitle="Manage app installation, language, theme, audio, and backgrounds."
+        title={t('settings')}
+        subtitle="Manage app installation, language, theme, audio, and reminders."
         showBack
         onBack={() => navigate('/home')}
       />
@@ -253,7 +216,7 @@ export const Settings = () => {
       {/* 1. App Installation Section */}
       <div className="space-y-3">
         <h3 className="text-xs font-semibold uppercase tracking-wider text-light-muted dark:text-dark-muted">
-          App Installation
+          {t('appInstallation')}
         </h3>
 
         {/* Priority 1: App Already Installed */}
@@ -265,7 +228,7 @@ export const Settings = () => {
               </div>
               <div>
                 <p className="font-bold text-base text-emerald-600 dark:text-emerald-400">
-                  JapDhara Installed ✓
+                  {t('installedStatus')}
                 </p>
                 <p className="text-xs text-light-muted dark:text-dark-muted mt-0.5">
                   Your spiritual practice is ready anytime on your home screen.
@@ -281,7 +244,7 @@ export const Settings = () => {
                 <Smartphone className="w-6 h-6" />
               </div>
               <div className="space-y-1">
-                <h4 className="font-bold text-base">Install JapDhara</h4>
+                <h4 className="font-bold text-base">{t('installApp')}</h4>
                 <p className="text-xs text-light-muted dark:text-dark-muted leading-relaxed">
                   Keep your daily Jaap just one tap away. Fast, focused & offline-ready.
                 </p>
@@ -295,7 +258,7 @@ export const Settings = () => {
                 onClick={handleNativeInstall}
                 className="w-full sm:w-auto px-6 py-2.5 text-sm font-bold shadow-glow-accent cursor-pointer"
               >
-                Install JapDhara
+                {t('installApp')}
               </Button>
               <span className="text-[11px] font-semibold text-light-muted dark:text-dark-muted">
                 Free • Secure • No account required
@@ -339,7 +302,7 @@ export const Settings = () => {
                 <Smartphone className="w-4 h-4" />
               </div>
               <div>
-                <p className="font-semibold text-sm">App Installation</p>
+                <p className="font-semibold text-sm">{t('appInstallation')}</p>
                 <p className="text-xs text-light-muted dark:text-dark-muted">
                   To install: Open browser menu &rarr; &ldquo;Install App&rdquo; or &ldquo;Add to Home Screen&rdquo;
                 </p>
@@ -352,7 +315,7 @@ export const Settings = () => {
       {/* 2. Language Section */}
       <div className="space-y-3">
         <h3 className="text-xs font-semibold uppercase tracking-wider text-light-muted dark:text-dark-muted">
-          Language
+          {t('language')}
         </h3>
         <Card className="p-4 flex items-center justify-between">
           <div className="flex items-center gap-3.5">
@@ -360,7 +323,7 @@ export const Settings = () => {
               <Globe className="w-5 h-5" />
             </div>
             <div>
-              <p className="font-bold text-sm">App Language</p>
+              <p className="font-bold text-sm">{t('selectLanguage')}</p>
               <p className="text-xs text-light-muted dark:text-dark-muted mt-0.5">
                 Select your preferred interface language
               </p>
@@ -370,7 +333,7 @@ export const Settings = () => {
           <select
             value={settings?.language || 'en'}
             onChange={(e) => updateSettings({ language: e.target.value })}
-            className="px-3 py-1.5 text-xs font-bold rounded-xl border border-light-border dark:border-dark-border bg-light-bg dark:bg-dark-bg focus:outline-none focus:ring-2 focus:ring-spiritual-500 cursor-pointer"
+            className="px-3.5 py-2 text-xs font-bold rounded-xl border border-light-border dark:border-dark-border bg-light-bg dark:bg-dark-bg focus:outline-none focus:ring-2 focus:ring-spiritual-500 cursor-pointer"
           >
             <option value="en">English</option>
             <option value="gu">ગુજરાતી</option>
@@ -379,74 +342,34 @@ export const Settings = () => {
         </Card>
       </div>
 
-      {/* 3. Appearance & Jaap Background */}
+      {/* 3. Appearance (Theme Mode only, Background feature removed) */}
       <div className="space-y-3">
         <h3 className="text-xs font-semibold uppercase tracking-wider text-light-muted dark:text-dark-muted">
-          Appearance & Jaap Background
+          {t('appearance')}
         </h3>
-        <Card className="divide-y divide-light-border dark:divide-dark-border">
-          <div className="p-4 flex items-center justify-between">
-            <div className="flex items-center gap-3.5">
-              <div className="p-3 rounded-2xl bg-spiritual-500/10 text-spiritual-500">
-                {theme === 'dark' ? <Moon className="w-5 h-5" /> : <Sun className="w-5 h-5" />}
-              </div>
-              <div>
-                <p className="font-bold text-sm">Theme Mode</p>
-                <p className="text-xs text-light-muted dark:text-dark-muted mt-0.5">
-                  Current: <span className="capitalize font-semibold text-spiritual-500">{theme}</span>
-                </p>
-              </div>
+        <Card className="p-4 flex items-center justify-between">
+          <div className="flex items-center gap-3.5">
+            <div className="p-3 rounded-2xl bg-spiritual-500/10 text-spiritual-500">
+              {theme === 'dark' ? <Moon className="w-5 h-5" /> : <Sun className="w-5 h-5" />}
             </div>
-
-            <Button variant="secondary" size="sm" onClick={toggleTheme}>
-              Toggle Theme
-            </Button>
-          </div>
-
-          {/* Background Preset Picker */}
-          <div className="p-4 space-y-3">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <ImageIcon className="w-4 h-4 text-spiritual-500" />
-                <p className="font-semibold text-sm">Jaap Screen Background</p>
-              </div>
-              <label className="text-xs font-bold text-spiritual-500 hover:underline cursor-pointer">
-                + Custom Wallpaper
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={handleCustomWallpaperUpload}
-                  className="hidden"
-                />
-              </label>
-            </div>
-
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1">
-              {BACKGROUND_PRESETS.map((preset) => {
-                const isSelected = (settings?.jaapBackground || 'dark') === preset.id;
-                return (
-                  <button
-                    key={preset.id}
-                    onClick={() => updateSettings({ jaapBackground: preset.id })}
-                    className={`p-2.5 rounded-xl border text-center text-xs font-semibold transition-all cursor-pointer ${
-                      isSelected
-                        ? 'border-spiritual-500 bg-spiritual-500/15 text-spiritual-600 dark:text-spiritual-400 font-bold ring-2 ring-spiritual-500/30'
-                        : 'border-light-border dark:border-dark-border hover:bg-light-hover dark:hover:bg-dark-hover'
-                    }`}
-                  >
-                    {preset.label}
-                  </button>
-                );
-              })}
+            <div>
+              <p className="font-bold text-sm">{t('themeMode')}</p>
+              <p className="text-xs text-light-muted dark:text-dark-muted mt-0.5">
+                Current: <span className="capitalize font-semibold text-spiritual-500">{theme === 'dark' ? t('darkTheme') : t('lightTheme')}</span>
+              </p>
             </div>
           </div>
+
+          <Button variant="secondary" size="sm" onClick={toggleTheme}>
+            Toggle Theme
+          </Button>
         </Card>
       </div>
 
       {/* 4. Sound & Haptic Feedback */}
       <div className="space-y-3">
         <h3 className="text-xs font-semibold uppercase tracking-wider text-light-muted dark:text-dark-muted">
-          Sound & Haptic Feedback
+          {t('soundAndFeedback')}
         </h3>
         <Card className="divide-y divide-light-border dark:divide-dark-border">
           <div className="p-4 flex items-center justify-between">
@@ -455,7 +378,7 @@ export const Settings = () => {
                 {settings?.soundType === 'none' ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
               </div>
               <div>
-                <p className="font-semibold text-sm">Chant Sound Effect</p>
+                <p className="font-semibold text-sm">{t('sound')}</p>
                 <p className="text-xs text-light-muted dark:text-dark-muted">Web Audio chime on bead tap</p>
               </div>
             </div>
@@ -484,7 +407,7 @@ export const Settings = () => {
                 <Vibrate className="w-4 h-4" />
               </div>
               <div>
-                <p className="font-semibold text-sm">Vibration Intensity</p>
+                <p className="font-semibold text-sm">{t('vibration')}</p>
                 <p className="text-xs text-light-muted dark:text-dark-muted">Device haptic feedback</p>
               </div>
             </div>
@@ -510,7 +433,7 @@ export const Settings = () => {
       {/* 5. Notifications & Reminders Section */}
       <div className="space-y-3">
         <h3 className="text-xs font-semibold uppercase tracking-wider text-light-muted dark:text-dark-muted">
-          Notifications & Reminders
+          {t('reminders')}
         </h3>
         <Card className="p-4 flex items-center justify-between">
           <div className="flex items-center gap-3.5">
@@ -545,7 +468,7 @@ export const Settings = () => {
                 <Target className="w-4 h-4" />
               </div>
               <div>
-                <p className="font-semibold text-sm">Daily Target Goal</p>
+                <p className="font-semibold text-sm">{t('dailyGoal')}</p>
                 <p className="text-xs text-light-muted dark:text-dark-muted">{dailyGoal} Jaap per day</p>
               </div>
             </div>
@@ -560,12 +483,12 @@ export const Settings = () => {
                 <BookOpen className="w-4 h-4" />
               </div>
               <div>
-                <p className="font-semibold text-sm">Default Mantra</p>
+                <p className="font-semibold text-sm">{t('changeMantra')}</p>
                 <p className="text-xs text-spiritual-500 font-serif">{currentMantra.sanskrit}</p>
               </div>
             </div>
             <Button variant="ghost" size="sm" onClick={() => navigate('/mantras')}>
-              Library
+              {t('library')}
             </Button>
           </div>
         </Card>
@@ -574,7 +497,7 @@ export const Settings = () => {
       {/* 7. Data Backup & Management */}
       <div className="space-y-3">
         <h3 className="text-xs font-semibold uppercase tracking-wider text-light-muted dark:text-dark-muted">
-          Data Backup & Management
+          {t('dataBackup')}
         </h3>
         <Card className="p-5 space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -585,13 +508,13 @@ export const Settings = () => {
               onClick={handleExportData}
               fullWidth
             >
-              Export Backup (JSON)
+              {t('exportBackup')}
             </Button>
 
             <label className="w-full">
               <div className="w-full py-2.5 px-4 rounded-full border border-light-border dark:border-dark-border bg-light-hover dark:bg-dark-hover hover:bg-spiritual-500/10 font-medium text-sm flex items-center justify-center gap-2 cursor-pointer transition-colors">
                 <Upload className="w-4 h-4 text-spiritual-500" />
-                <span>Import Backup</span>
+                <span>{t('importBackup')}</span>
               </div>
               <input
                 type="file"
@@ -610,13 +533,13 @@ export const Settings = () => {
               onClick={() => setIsClearModalOpen(true)}
               fullWidth
             >
-              Clear All Data
+              {t('clearAllData')}
             </Button>
           </div>
         </Card>
       </div>
 
-      {/* 8. About JapDhara */}
+      {/* 8. About JapDhara (Version v1.2) */}
       <div className="space-y-3">
         <h3 className="text-xs font-semibold uppercase tracking-wider text-light-muted dark:text-dark-muted">
           About JapDhara
@@ -627,9 +550,9 @@ export const Settings = () => {
               🕉
             </div>
             <div>
-              <h4 className="font-bold text-lg">JapDhara <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-spiritual-500/10 text-spiritual-500">v1.0.0</span></h4>
+              <h4 className="font-bold text-lg">JapDhara <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-spiritual-500/10 text-spiritual-500">v{APP_VERSION}</span></h4>
               <p className="text-xs font-medium text-light-muted dark:text-dark-muted italic">
-                &ldquo;Let your Jaap flow.&rdquo; — A peaceful journey of every chant.
+                &ldquo;{t('appTagline')}&rdquo; — {t('version')}
               </p>
             </div>
           </div>
@@ -637,7 +560,7 @@ export const Settings = () => {
           <div className="space-y-2 text-xs text-light-muted dark:text-dark-muted leading-relaxed pt-2 border-t border-light-border dark:border-dark-border">
             <div className="flex items-center gap-2 text-light-text dark:text-dark-text font-semibold">
               <Shield className="w-4 h-4 text-emerald-500" />
-              <span>Local Privacy Guarantee</span>
+              <span>{t('privacyGuarantee')}</span>
             </div>
             <p>
               Your Jaap and meditation data is stored locally in your browser. No personal data or chant logs are sent to external servers.
@@ -659,10 +582,10 @@ export const Settings = () => {
 
           <div className="flex gap-3 pt-2">
             <Button variant="secondary" fullWidth onClick={() => setIsClearModalOpen(false)}>
-              Cancel
+              {t('cancel')}
             </Button>
             <Button variant="danger" fullWidth onClick={handleClearAllData}>
-              Clear All Data
+              {t('clearAllData')}
             </Button>
           </div>
         </div>

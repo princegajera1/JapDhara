@@ -1,8 +1,9 @@
-import React, { createContext, useState, useEffect, useMemo } from 'react';
+import React, { createContext, useState, useEffect, useMemo, useCallback } from 'react';
 import storage from '../utils/storage';
 import { INITIAL_MANTRAS } from '../data/mantras';
 import { getLocalDateKey } from '../utils/dateUtils';
 import { calculateStreaks } from '../utils/streakUtils';
+import { getTranslation } from '../data/translations';
 
 export const AppContext = createContext();
 
@@ -34,10 +35,12 @@ const DEFAULT_PROFILE = {
 
 const DEFAULT_SETTINGS = {
   soundEnabled: true,
+  soundType: 'bead',
   vibrationEnabled: true,
-  hapticFeedback: true,
+  hapticIntensity: 'light',
   reminderTime: '06:00:00',
   remindersEnabled: false,
+  language: 'en',
 };
 
 export const AppProvider = ({ children }) => {
@@ -69,8 +72,20 @@ export const AppProvider = ({ children }) => {
     storage.getItem(KEYS.USER_PROFILE, DEFAULT_PROFILE)
   );
 
-  const [settings, setSettingsState] = useState(() =>
-    storage.getItem(KEYS.SETTINGS, DEFAULT_SETTINGS)
+  const [settings, setSettingsState] = useState(() => {
+    const saved = storage.getItem(KEYS.SETTINGS, DEFAULT_SETTINGS);
+    // Remove obsolete background properties if present
+    const { jaapBackground, customWallpaperUrl, ...cleanSettings } = saved || {};
+    return { ...DEFAULT_SETTINGS, ...cleanSettings };
+  });
+
+  // Translation helper function t(key)
+  const t = useCallback(
+    (key) => {
+      const lang = settings?.language || 'en';
+      return getTranslation(lang, key);
+    },
+    [settings?.language]
   );
 
   // Active dates tracking (App Open Activity)
@@ -356,6 +371,8 @@ export const AppProvider = ({ children }) => {
   return (
     <AppContext.Provider
       value={{
+        t,
+        language: settings?.language || 'en',
         isOnboardingCompleted,
         completeOnboarding,
         dailyGoal,

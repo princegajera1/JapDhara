@@ -1,4 +1,4 @@
-const CACHE_NAME = 'japdhara-v6';
+const CACHE_NAME = 'japdhara-v1.2';
 const PRECACHE_ASSETS = [
   '/',
   '/index.html',
@@ -6,7 +6,7 @@ const PRECACHE_ASSETS = [
   '/icon.svg'
 ];
 
-// Install Event - Pre-cache essential app shell
+// Install Event - Pre-cache essential app shell and take over immediately
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
@@ -16,7 +16,7 @@ self.addEventListener('install', (event) => {
   self.skipWaiting();
 });
 
-// Activate Event - Purge old caches from previous deployments
+// Activate Event - Purge old caches from previous deployments and claim clients immediately
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((keys) => {

@@ -30,6 +30,7 @@ const PRESET_GOALS = [108, 216, 324, 540, 1008, 1080];
 export const Jaap = () => {
   const navigate = useNavigate();
   const {
+    t,
     todayCount,
     setTodayCount,
     dailyGoal,
@@ -159,24 +160,11 @@ export const Jaap = () => {
     }
   };
 
-  // Background style helper
-  const bgStyle = useMemo(() => {
-    const bgKey = settings?.jaapBackground || 'dark';
-    if (bgKey === 'custom' && settings?.customWallpaperUrl) {
-      return {
-        backgroundImage: `url(${settings.customWallpaperUrl})`,
-        backgroundSize: 'cover',
-        backgroundPosition: 'center',
-      };
-    }
-    return {};
-  }, [settings]);
-
   return (
-    <div style={bgStyle} className="space-y-6 max-w-xl mx-auto pb-12 rounded-3xl p-2 sm:p-4 transition-all">
+    <div className="space-y-6 max-w-xl mx-auto pb-12 transition-all">
       {/* Header & Quick Navigation Links */}
       <PageHeader
-        title="Jaap Counter"
+        title={t('jaapCounter')}
         subtitle="Turn every chant into a peaceful moment of focus."
         showBack
         onBack={() => navigate('/home')}
@@ -187,14 +175,14 @@ export const Jaap = () => {
               className="p-2 rounded-xl bg-spiritual-500/10 text-spiritual-600 dark:text-spiritual-400 hover:bg-spiritual-500/20 text-xs font-semibold flex items-center gap-1.5 transition-colors"
             >
               <Layers className="w-4 h-4" />
-              <span className="hidden sm:inline">Digital Mala</span>
+              <span className="hidden sm:inline">{t('digitalMala')}</span>
             </Link>
             <Link
               to="/mantras"
               className="p-2 rounded-xl bg-light-hover dark:bg-dark-hover text-light-muted dark:text-dark-muted hover:text-light-text dark:hover:text-dark-text text-xs font-semibold flex items-center gap-1.5 transition-colors"
             >
               <BookOpen className="w-4 h-4" />
-              <span className="hidden sm:inline">Library</span>
+              <span className="hidden sm:inline">{t('library')}</span>
             </Link>
           </div>
         }
@@ -335,7 +323,7 @@ export const Jaap = () => {
             className="py-2.5 text-xs font-semibold"
             ariaLabel="Change goal"
           >
-            <span>Set Goal</span>
+            <span>{t('setGoal')}</span>
           </Button>
 
           <Button
@@ -346,7 +334,7 @@ export const Jaap = () => {
             className="py-2.5 text-xs font-semibold text-rose-500 hover:text-rose-600"
             ariaLabel="Reset counter"
           >
-            <span>Reset</span>
+            <span>{t('reset')}</span>
           </Button>
         </div>
       </Card>
@@ -389,7 +377,7 @@ export const Jaap = () => {
               fullWidth
               onClick={() => setIsResetModalOpen(false)}
             >
-              Cancel
+              {t('cancel')}
             </Button>
             <Button
               variant="danger"

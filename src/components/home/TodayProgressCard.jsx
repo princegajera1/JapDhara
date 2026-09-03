@@ -8,7 +8,7 @@ import { Play } from 'lucide-react';
 
 export const TodayProgressCard = () => {
   const navigate = useNavigate();
-  const { todayCount, dailyGoal } = useApp();
+  const { todayCount, dailyGoal, t } = useApp();
 
   const completed = todayCount || 0;
   const goal = dailyGoal || 108;
@@ -19,10 +19,10 @@ export const TodayProgressCard = () => {
       <div className="flex flex-col md:flex-row items-center justify-between gap-6">
         <div className="flex flex-col items-center md:items-start text-center md:text-left space-y-3 w-full md:w-auto">
           <span className="inline-block px-3 py-1 text-xs font-semibold rounded-full bg-spiritual-500/20 text-spiritual-600 dark:text-spiritual-400">
-            Today's Progress
+            {t('todaysJaap')}
           </span>
 
-          <h2 className="text-xl md:text-2xl font-bold">Today's Jaap</h2>
+          <h2 className="text-xl md:text-2xl font-bold">{t('todaysJaap')}</h2>
 
           <p className="text-3xl md:text-4xl font-extrabold tracking-tight text-spiritual-600 dark:text-spiritual-400">
             {completed} / {goal} <span className="text-xl font-semibold text-light-text dark:text-dark-text">Jaap</span>
@@ -48,9 +48,9 @@ export const TodayProgressCard = () => {
             size="lg"
             icon={Play}
             onClick={() => navigate('/jaap')}
-            className="w-full md:w-auto px-8 py-3.5 text-base font-semibold shadow-soft-md"
+            className="w-full md:w-auto px-8 py-3.5 text-base font-semibold shadow-soft-md cursor-pointer"
           >
-            Start Jaap
+            {t('startJaap')}
           </Button>
         </div>
       </div>

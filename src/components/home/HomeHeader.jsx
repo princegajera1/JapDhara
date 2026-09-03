@@ -1,11 +1,11 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import useApp from '../../hooks/useApp';
-import { Settings, User } from 'lucide-react';
+import { Settings } from 'lucide-react';
 
 export const HomeHeader = () => {
   const navigate = useNavigate();
-  const { profile } = useApp();
+  const { profile, t } = useApp();
 
   const formattedDate = new Date().toLocaleDateString(undefined, {
     weekday: 'long',
@@ -20,7 +20,7 @@ export const HomeHeader = () => {
           Namaste 🙏
         </h1>
         <p className="text-sm font-semibold text-spiritual-600 dark:text-spiritual-400 mt-0.5">
-          Welcome to JapDhara
+          {t('welcomeBack')} — {profile?.name || 'Seeker'}
         </p>
         <p className="text-xs text-light-muted dark:text-dark-muted mt-0.5">
           {formattedDate}
@@ -30,7 +30,7 @@ export const HomeHeader = () => {
       <div className="flex items-center gap-2">
         <button
           onClick={() => navigate('/settings')}
-          className="p-2 rounded-full hover:bg-light-hover dark:hover:bg-dark-hover text-light-muted dark:text-dark-muted hover:text-spiritual-500 transition-colors"
+          className="p-2 rounded-full hover:bg-light-hover dark:hover:bg-dark-hover text-light-muted dark:text-dark-muted hover:text-spiritual-500 transition-colors cursor-pointer"
           aria-label="Open Settings"
         >
           <Settings className="w-5 h-5" />
