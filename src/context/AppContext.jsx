@@ -84,7 +84,6 @@ export const AppProvider = ({ children }) => {
     if (!lastDate) {
       storage.setItem(KEYS.LAST_DATE, today);
     }
-    // Migration fallback for legacy keys
     return storage.getItem(KEYS.TODAY_JAAP, storage.getItem('japdhara_today_count', 0));
   });
 
@@ -160,27 +159,28 @@ export const AppProvider = ({ children }) => {
     storage.setItem('japdhara_recent_activity', recentSessions);
   }, [recentSessions]);
 
-  // Master Chant Recorder: Single action updating Today Count, Bead Progress, Malas, and History
+  // Master Chant Recorder: Uses functional state updates to prevent stale closure race conditions
   const recordChant = (amount = 1) => {
     const today = getTodayDateString();
     storage.setItem(KEYS.LAST_DATE, today);
 
-    // 1. Update Today's Count
-    const newTodayCount = todayCount + amount;
-    setTodayCountState(newTodayCount);
+    // 1. Update Today's Count functionally
+    setTodayCountState((prevCount) => prevCount + amount);
 
-    // 2. Update Digital Mala Bead Progress
-    let newBead = currentBead + amount;
-    if (newBead > 108) {
-      const extraMalas = Math.floor((newBead - 1) / 108);
-      setCompletedMalasState((prev) => prev + extraMalas);
-      newBead = ((newBead - 1) % 108) + 1;
-    }
-    setCurrentBeadState(newBead);
+    // 2. Update Digital Mala Bead Progress functionally
+    setCurrentBeadState((prevBead) => {
+      let newBead = prevBead + amount;
+      if (newBead > 108) {
+        const extraMalas = Math.floor((newBead - 1) / 108);
+        setCompletedMalasState((prevMalas) => prevMalas + extraMalas);
+        newBead = ((newBead - 1) % 108) + 1;
+      }
+      return newBead;
+    });
 
     // 3. Append to Session History
     const newSession = {
-      id: Date.now().toString(),
+      id: `${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
       date: new Date().toLocaleDateString(undefined, {
         month: 'short',
         day: 'numeric',
@@ -195,12 +195,12 @@ export const AppProvider = ({ children }) => {
       timestamp: new Date().toISOString(),
     };
 
-    setRecentSessionsState((prev) => [newSession, ...prev]);
+    setRecentSessionsState((prevSessions) => [newSession, ...prevSessions]);
   };
 
   const addMeditationSession = (sessionData) => {
     const newSession = {
-      id: Date.now().toString(),
+      id: `${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
       date: new Date().toLocaleDateString(undefined, {
         month: 'short',
         day: 'numeric',
@@ -281,7 +281,7 @@ export const AppProvider = ({ children }) => {
 
   const addJaapSession = (session) => {
     const newSession = {
-      id: Date.now().toString(),
+      id: `${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
       date: new Date().toLocaleDateString(undefined, {
         month: 'short',
         day: 'numeric',
