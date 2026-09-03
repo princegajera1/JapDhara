@@ -20,7 +20,7 @@ import Button from '../components/ui/Button';
 import Modal from '../components/common/Modal';
 import useApp from '../hooks/useApp';
 
-const AVATAR_OPTIONS = ['🧘', '🕉', '🙏', '📿', '✨', '🌸', '🌿', '🌅'];
+const AVATAR_OPTIONS = ['🧘', 'ॐ', '🙏', '☸️', '✨', '🌸', '🌿', '🪷'];
 
 export const Profile = () => {
   const navigate = useNavigate();
@@ -134,6 +134,7 @@ export const Profile = () => {
     updateProfile({
       name: editName.trim(),
       avatar: editAvatar,
+      hasCompletedSetup: true,
     });
     setIsEditModalOpen(false);
   };
@@ -310,15 +311,15 @@ export const Profile = () => {
             <label className="block text-xs font-semibold text-light-muted dark:text-dark-muted mb-2">
               Select Avatar Symbol
             </label>
-            <div className="flex items-center justify-around p-2 rounded-2xl bg-light-hover/60 dark:bg-dark-hover/60">
+            <div className="grid grid-cols-4 gap-2.5 p-2 rounded-2xl bg-light-hover/60 dark:bg-dark-hover/60">
               {AVATAR_OPTIONS.map((emoji) => (
                 <button
                   key={emoji}
                   type="button"
                   onClick={() => setEditAvatar(emoji)}
-                  className={`w-10 h-10 rounded-full flex items-center justify-center text-xl transition-all ${
+                  className={`h-11 rounded-xl flex items-center justify-center text-2xl transition-all cursor-pointer ${
                     editAvatar === emoji
-                      ? 'bg-spiritual-500 text-white ring-2 ring-spiritual-500/40 scale-110'
+                      ? 'bg-spiritual-500 text-white ring-2 ring-spiritual-500/40 scale-105 shadow-soft-sm'
                       : 'hover:bg-spiritual-500/10'
                   }`}
                 >

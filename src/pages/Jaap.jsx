@@ -3,7 +3,6 @@ import { useNavigate, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
   RotateCcw,
-  Undo2,
   Plus,
   Play,
   Square,
@@ -55,12 +54,8 @@ export const Jaap = () => {
   const percentage = Math.min(100, Math.round((todayCount / dailyGoal) * 100));
   const isGoalComplete = todayCount >= dailyGoal;
 
-  // Atomic single chant handler protected against rapid/double-tap events
-  const handleChant = (e) => {
-    if (e && e.type === 'touchstart') {
-      e.preventDefault(); // Prevent ghost click firing after touchstart
-    }
-
+  // Single reliable click handler - prevents duplicate touch+click double counting
+  const handleChant = () => {
     if (!isSessionActive) {
       setIsSessionActive(true);
     }
@@ -82,7 +77,7 @@ export const Jaap = () => {
     }
   };
 
-  // Keyboard accessibility: Spacebar increments count
+  // Keyboard accessibility: Spacebar increments count safely
   useEffect(() => {
     const handleKeyDown = (e) => {
       if (
@@ -98,14 +93,6 @@ export const Jaap = () => {
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [todayCount, isSessionActive, isResetModalOpen, isMantraModalOpen, isGoalModalOpen]);
-
-  // Undo handler: removes exactly 1 Jaap without going below 0
-  const handleUndo = () => {
-    if (todayCount > 0) {
-      setTodayCount(todayCount - 1);
-      setSessionCount((prev) => Math.max(0, prev - 1));
-    }
-  };
 
   // Confirm Reset handler: resets today's count to 0 safely
   const handleConfirmReset = () => {
@@ -218,7 +205,7 @@ export const Jaap = () => {
 
         {/* Circular Progress Ring with Center Counts */}
         <div className="relative py-2">
-          <ProgressRing value={todayCount} max={dailyGoal} size={230} strokeWidth={12}>
+          <ProgressRing value={Math.min(todayCount, dailyGoal)} max={dailyGoal} size={230} strokeWidth={12}>
             <div className="space-y-1">
               <motion.span
                 key={todayCount}
@@ -243,7 +230,6 @@ export const Jaap = () => {
         <div className="w-full max-w-xs space-y-3">
           <motion.button
             onClick={handleChant}
-            onTouchStart={handleChant}
             animate={{ scale: tapAnimation ? 0.94 : 1 }}
             transition={{ duration: 0.1 }}
             className="w-full py-6 rounded-3xl bg-spiritual-500 hover:bg-spiritual-600 text-white font-bold text-xl md:text-2xl shadow-soft-lg hover:shadow-glow-accent flex items-center justify-center gap-3 transition-all duration-150 active:scale-95 cursor-pointer touch-manipulation focus:outline-none focus-visible:ring-4 focus-visible:ring-spiritual-500/50"
@@ -258,14 +244,14 @@ export const Jaap = () => {
           </p>
         </div>
 
-        {/* Secondary Action Bar: Undo, +1, Reset, Goal Selector */}
-        <div className="grid grid-cols-4 gap-2.5 w-full pt-4 border-t border-light-border dark:border-dark-border">
+        {/* Rebalanced Secondary Action Bar (No Undo Button) */}
+        <div className="grid grid-cols-3 gap-3 w-full pt-4 border-t border-light-border dark:border-dark-border">
           <Button
             variant="secondary"
             size="sm"
             onClick={handleChant}
             icon={Plus}
-            className="flex-col py-2.5 text-xs h-auto"
+            className="py-2.5 text-xs font-semibold"
             ariaLabel="Add one chant"
           >
             <span>+1 Jaap</span>
@@ -274,24 +260,12 @@ export const Jaap = () => {
           <Button
             variant="secondary"
             size="sm"
-            onClick={handleUndo}
-            disabled={todayCount <= 0}
-            icon={Undo2}
-            className="flex-col py-2.5 text-xs h-auto"
-            ariaLabel="Undo last chant"
-          >
-            <span>Undo</span>
-          </Button>
-
-          <Button
-            variant="secondary"
-            size="sm"
             onClick={() => setIsGoalModalOpen(true)}
             icon={Target}
-            className="flex-col py-2.5 text-xs h-auto"
+            className="py-2.5 text-xs font-semibold"
             ariaLabel="Change goal"
           >
-            <span>Goal</span>
+            <span>Set Goal</span>
           </Button>
 
           <Button
@@ -299,7 +273,7 @@ export const Jaap = () => {
             size="sm"
             onClick={() => setIsResetModalOpen(true)}
             icon={RotateCcw}
-            className="flex-col py-2.5 text-xs h-auto text-rose-500 hover:text-rose-600"
+            className="py-2.5 text-xs font-semibold text-rose-500 hover:text-rose-600"
             ariaLabel="Reset counter"
           >
             <span>Reset</span>

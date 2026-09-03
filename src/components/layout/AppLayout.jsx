@@ -3,6 +3,7 @@ import { Outlet } from 'react-router-dom';
 import Header from './Header';
 import DesktopSidebar from './DesktopSidebar';
 import MobileBottomNav from './MobileBottomNav';
+import ProfileSetupModal from '../common/ProfileSetupModal';
 
 export const AppLayout = () => {
   return (
@@ -10,11 +11,12 @@ export const AppLayout = () => {
       <Header />
       <div className="flex-1 flex max-w-7xl w-full mx-auto">
         <DesktopSidebar />
-        <main className="flex-1 p-4 md:p-8 pb-24 lg:pb-8 max-w-full overflow-x-hidden">
+        <main className="flex-1 p-4 md:p-8 pb-28 lg:pb-8 max-w-full overflow-x-hidden">
           <Outlet />
         </main>
       </div>
       <MobileBottomNav />
+      <ProfileSetupModal />
     </div>
   );
 };

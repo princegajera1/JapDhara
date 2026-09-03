@@ -1,9 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
   RotateCcw,
-  Undo2,
   ChevronDown,
   Sparkles,
   Check,
@@ -27,7 +26,6 @@ export const Mala = () => {
     currentMantra,
     setCurrentMantra,
     completedMalas,
-    setCompletedMalas,
     customMantras,
     recordChant,
     settings,
@@ -39,9 +37,11 @@ export const Mala = () => {
   const [celebrationText, setCelebrationText] = useState('1 Mala Complete 🙏');
   const [tapAnimation, setTapAnimation] = useState(false);
 
+  const prevCountRef = useRef(todayCount);
+
   const availableMantras = [...INITIAL_MANTRAS, ...customMantras];
 
-  // Derive exact mala & bead details from master todayCount
+  // Derive exact mala & bead details from master todayCount using formula ((count-1)%108)+1
   const { currentBead, completedMalas: calculatedMalas } = getMalaProgressDetails(todayCount);
   const displayMalas = Math.max(completedMalas, calculatedMalas);
 
@@ -57,21 +57,21 @@ export const Mala = () => {
     return { x, y };
   };
 
-  const handleChantMala = (e) => {
-    if (e && e.type === 'touchstart') {
-      e.preventDefault();
-    }
-
+  const handleChantMala = () => {
+    const prevCount = prevCountRef.current;
     const nextCount = todayCount + 1;
+
     recordChant(1);
 
-    // Check if exactly completed a full 108 mala
-    if (nextCount % MALA_BEADS === 0 && nextCount > 0) {
+    // Trigger toast ONLY when crossing an exact multiple of 108 (e.g. 107 -> 108, 215 -> 216)
+    if (nextCount > 0 && nextCount % MALA_BEADS === 0 && prevCount % MALA_BEADS !== 0) {
       const malaNum = Math.floor(nextCount / MALA_BEADS);
-      setCelebrationText(`${malaNum} Mala Complete 🙏`);
+      setCelebrationText(`${malaNum} Mala${malaNum > 1 ? 's' : ''} Complete 🙏`);
       setShowCelebration(true);
       setTimeout(() => setShowCelebration(false), 3500);
     }
+
+    prevCountRef.current = nextCount;
 
     setTapAnimation(true);
     setTimeout(() => setTapAnimation(false), 120);
@@ -86,6 +86,10 @@ export const Mala = () => {
   };
 
   useEffect(() => {
+    prevCountRef.current = todayCount;
+  }, [todayCount]);
+
+  useEffect(() => {
     const handleKeyDown = (e) => {
       if (e.code === 'Space' && !isResetModalOpen && !isMantraModalOpen) {
         e.preventDefault();
@@ -95,12 +99,6 @@ export const Mala = () => {
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [todayCount, isResetModalOpen, isMantraModalOpen]);
-
-  const handleUndo = () => {
-    if (todayCount > 0) {
-      setTodayCount(todayCount - 1);
-    }
-  };
 
   const handleConfirmReset = () => {
     setTodayCount(0);
@@ -183,7 +181,7 @@ export const Mala = () => {
               const { x, y } = getBeadCoordinates(index, 300, 125);
               const isGuruBead = index === 0;
               const isCurrent = beadNum === currentBead;
-              const isPassed = beadNum < currentBead;
+              const isPassed = currentBead > 0 && beadNum < currentBead;
 
               if (isGuruBead) {
                 return (
@@ -230,17 +228,17 @@ export const Mala = () => {
 
           <div className="z-10 flex flex-col items-center justify-center space-y-0.5">
             <span className="text-[11px] font-bold uppercase tracking-wider text-spiritual-500">
-              Mala {displayMalas + 1}
+              Current Mala
             </span>
             <span className="text-3xl font-black tracking-tight">
               {currentBead} <span className="text-sm font-normal text-light-muted dark:text-dark-muted">/ 108</span>
             </span>
             <p className="text-xs font-semibold text-light-muted dark:text-dark-muted">
-              Total: <span className="font-bold text-light-text dark:text-dark-text">{todayCount}</span> Jaap
+              Total Jaap: <span className="font-bold text-light-text dark:text-dark-text">{todayCount}</span>
             </p>
             {displayMalas > 0 && (
-              <span className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full mt-1">
-                {displayMalas} Mala{displayMalas > 1 ? 's' : ''} Completed
+              <span className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2.5 py-0.5 rounded-full mt-1">
+                Completed Malas: {displayMalas}
               </span>
             )}
           </div>
@@ -249,14 +247,13 @@ export const Mala = () => {
         <div className="w-full max-w-xs space-y-2">
           <motion.button
             onClick={handleChantMala}
-            onTouchStart={handleChantMala}
             animate={{ scale: tapAnimation ? 0.94 : 1 }}
             transition={{ duration: 0.1 }}
             className="w-full py-5 rounded-3xl bg-spiritual-500 hover:bg-spiritual-600 text-white font-bold text-xl shadow-soft-lg hover:shadow-glow-accent flex items-center justify-center gap-2.5 transition-all duration-150 active:scale-95 cursor-pointer touch-manipulation focus:outline-none focus-visible:ring-4 focus-visible:ring-spiritual-500/50"
             aria-label="Advance Mala Bead"
           >
             <span className="text-2xl">🙏</span>
-            <span>Jaap Bead</span>
+            <span>Jaap Bead (+1)</span>
           </motion.button>
 
           <p className="text-[11px] text-light-muted dark:text-dark-muted font-medium">
@@ -266,42 +263,30 @@ export const Mala = () => {
 
         <div className="w-full space-y-4 pt-2 border-t border-light-border dark:border-dark-border">
           <div className="grid grid-cols-3 gap-2 text-center text-xs">
-            <div className="p-2 rounded-xl bg-light-hover/50 dark:bg-dark-hover/50">
+            <div className="p-2.5 rounded-xl bg-light-hover/50 dark:bg-dark-hover/50">
               <p className="text-[10px] text-light-muted dark:text-dark-muted uppercase font-medium">Current Bead</p>
               <p className="font-bold text-spiritual-500">{currentBead} / 108</p>
             </div>
-            <div className="p-2 rounded-xl bg-light-hover/50 dark:bg-dark-hover/50">
-              <p className="text-[10px] text-light-muted dark:text-dark-muted uppercase font-medium">Today Total</p>
-              <p className="font-bold">{todayCount} Jaap</p>
+            <div className="p-2.5 rounded-xl bg-light-hover/50 dark:bg-dark-hover/50">
+              <p className="text-[10px] text-light-muted dark:text-dark-muted uppercase font-medium">Total Jaap</p>
+              <p className="font-bold">{todayCount}</p>
             </div>
-            <div className="p-2 rounded-xl bg-light-hover/50 dark:bg-dark-hover/50">
+            <div className="p-2.5 rounded-xl bg-light-hover/50 dark:bg-dark-hover/50">
               <p className="text-[10px] text-light-muted dark:text-dark-muted uppercase font-medium">Completed</p>
-              <p className="font-bold text-emerald-600 dark:text-emerald-400">{displayMalas} Mala</p>
+              <p className="font-bold text-emerald-600 dark:text-emerald-400">{displayMalas} Mala{displayMalas !== 1 ? 's' : ''}</p>
             </div>
           </div>
 
-          <div className="flex gap-3">
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={handleUndo}
-              disabled={todayCount <= 0}
-              icon={Undo2}
-              fullWidth
-            >
-              Undo
-            </Button>
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={() => setIsResetModalOpen(true)}
-              icon={RotateCcw}
-              fullWidth
-              className="text-rose-500 hover:text-rose-600"
-            >
-              Reset Mala
-            </Button>
-          </div>
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => setIsResetModalOpen(true)}
+            icon={RotateCcw}
+            fullWidth
+            className="text-rose-500 hover:text-rose-600 font-semibold"
+          >
+            Reset Current Mala
+          </Button>
         </div>
       </Card>
 
