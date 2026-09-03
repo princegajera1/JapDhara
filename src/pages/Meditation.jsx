@@ -26,21 +26,16 @@ import Toast from '../components/common/Toast';
 import EmptyState from '../components/common/EmptyState';
 import useApp from '../hooks/useApp';
 import storage from '../utils/storage';
-import {
-  startAmbientAudio,
-  stopAmbientAudio,
-  updateAmbientVolume,
-  playCompletionBell,
-} from '../utils/meditationAudio';
+import meditationAudioManager from '../utils/MeditationAudioManager';
 
 const STORAGE_KEY_AUDIO = 'japdhara_meditation_audio';
 
 const DEFAULT_AUDIO_SETTINGS = {
   soundEnabled: true,
   selectedSound: 'river',
-  soundVolume: 0.6,
+  soundVolume: 0.5, // 50%
   reverbEnabled: true,
-  reverbAmount: 0.5,
+  reverbAmount: 0.5, // Medium
   completionBellEnabled: true,
   completionBellVolume: 0.8,
 };
@@ -116,6 +111,14 @@ export const Meditation = () => {
     storage.setItem(STORAGE_KEY_AUDIO, audioSettings);
   }, [audioSettings]);
 
+  // Clean up Audio on Component Unmount
+  useEffect(() => {
+    return () => {
+      meditationAudioManager.stopAll();
+      if (timerRef.current) clearInterval(timerRef.current);
+    };
+  }, []);
+
   // Sync initial time when user picks duration (when not running)
   const handleSelectDuration = (minutes) => {
     if (isRunning) return;
@@ -124,12 +127,46 @@ export const Meditation = () => {
     setIsPaused(false);
   };
 
-  // Dynamic Volume update during active session
-  useEffect(() => {
+  // Real-time Volume & Reverb updates when sliders are dragged
+  const handleVolumeChange = (newVol) => {
+    const val = parseFloat(newVol);
+    setAudioSettings((prev) => ({ ...prev, soundVolume: val }));
+    meditationAudioManager.setVolume(val);
+  };
+
+  const handleReverbToggle = () => {
+    const nextVal = !audioSettings.reverbEnabled;
+    setAudioSettings((prev) => ({ ...prev, reverbEnabled: nextVal }));
+    meditationAudioManager.setReverb(nextVal, audioSettings.reverbAmount);
+  };
+
+  const handleReverbAmountChange = (newAmount) => {
+    const val = parseFloat(newAmount);
+    setAudioSettings((prev) => ({ ...prev, reverbAmount: val }));
+    meditationAudioManager.setReverb(audioSettings.reverbEnabled, val);
+  };
+
+  const handleSoundSelect = (soundId) => {
+    setAudioSettings((prev) => ({ ...prev, selectedSound: soundId }));
     if (isRunning && !isPaused && audioSettings.soundEnabled) {
-      updateAmbientVolume(audioSettings.soundVolume);
+      meditationAudioManager.startSound(soundId, { ...audioSettings, selectedSound: soundId });
     }
-  }, [audioSettings.soundVolume, isRunning, isPaused, audioSettings.soundEnabled]);
+  };
+
+  const handleSoundToggle = () => {
+    const nextEnabled = !audioSettings.soundEnabled;
+    setAudioSettings((prev) => ({ ...prev, soundEnabled: nextEnabled }));
+    if (isRunning && !isPaused) {
+      if (nextEnabled) {
+        meditationAudioManager.startSound(audioSettings.selectedSound, {
+          ...audioSettings,
+          soundEnabled: true,
+        });
+      } else {
+        meditationAudioManager.stopAll();
+      }
+    }
+  };
 
   // Accurate Timestamp-Based Timer Engine
   useEffect(() => {
@@ -189,7 +226,7 @@ export const Meditation = () => {
   useEffect(() => {
     const handleVisibilityChange = () => {
       if (document.hidden && isRunning && !isPaused) {
-        // Continue tracking elapsed time accurately via endTimeRef
+        // Timer continues tracking elapsed time accurately via endTimeRef
       }
     };
     document.addEventListener('visibilitychange', handleVisibilityChange);
@@ -205,42 +242,27 @@ export const Meditation = () => {
     setIsRunning(true);
     setIsPaused(false);
 
-    // Start Ambient Sound
-    if (audioSettings.soundEnabled && audioSettings.selectedSound !== 'silent') {
-      startAmbientAudio({
-        soundType: audioSettings.selectedSound,
-        volume: audioSettings.soundVolume,
-        reverbEnabled: audioSettings.reverbEnabled,
-        reverbAmount: audioSettings.reverbAmount,
-      });
-    }
+    // Start Ambient Sound via Audio Manager
+    meditationAudioManager.startSound(audioSettings.selectedSound, audioSettings);
   };
 
   const handlePauseTimer = () => {
     setIsPaused(true);
     pausedTimeLeftRef.current = timeLeft;
     endTimeRef.current = null;
-    stopAmbientAudio();
+    meditationAudioManager.pause();
   };
 
   const handleResumeTimer = () => {
     setIsPaused(false);
     endTimeRef.current = Date.now() + (pausedTimeLeftRef.current || timeLeft) * 1000;
-
-    if (audioSettings.soundEnabled && audioSettings.selectedSound !== 'silent') {
-      startAmbientAudio({
-        soundType: audioSettings.selectedSound,
-        volume: audioSettings.soundVolume,
-        reverbEnabled: audioSettings.reverbEnabled,
-        reverbAmount: audioSettings.reverbAmount,
-      });
-    }
+    meditationAudioManager.resume(audioSettings.selectedSound, audioSettings);
   };
 
   const handleResetTimer = () => {
     setIsRunning(false);
     setIsPaused(false);
-    stopAmbientAudio();
+    meditationAudioManager.stopAll();
     pausedTimeLeftRef.current = null;
     endTimeRef.current = null;
     setTimeLeft(selectedDuration * 60);
@@ -256,7 +278,7 @@ export const Meditation = () => {
   const handleCompleteSession = (elapsedSecs, isNaturalCompletion = false) => {
     setIsRunning(false);
     setIsPaused(false);
-    stopAmbientAudio();
+    meditationAudioManager.stopAll();
 
     if (timerRef.current) clearInterval(timerRef.current);
     endTimeRef.current = null;
@@ -267,7 +289,7 @@ export const Meditation = () => {
     // Play ONE peaceful completion bell if natural completion reached 00:00
     if (isNaturalCompletion && audioSettings.completionBellEnabled && !hasPlayedCompletionRef.current) {
       hasPlayedCompletionRef.current = true;
-      playCompletionBell(audioSettings.completionBellVolume);
+      meditationAudioManager.playCompletionBell(audioSettings.completionBellVolume);
     }
 
     const actualSecs = elapsedSecs || Math.max(1, selectedDuration * 60 - timeLeft);
@@ -280,23 +302,6 @@ export const Meditation = () => {
     });
 
     setTimeLeft(selectedDuration * 60);
-  };
-
-  const updateAudioState = (fields) => {
-    setAudioSettings((prev) => {
-      const next = { ...prev, ...fields };
-      if (isRunning && !isPaused && next.soundEnabled) {
-        startAmbientAudio({
-          soundType: next.selectedSound,
-          volume: next.soundVolume,
-          reverbEnabled: next.reverbEnabled,
-          reverbAmount: next.reverbAmount,
-        });
-      } else if (!next.soundEnabled || next.selectedSound === 'silent') {
-        stopAmbientAudio();
-      }
-      return next;
-    });
   };
 
   // Format MM:SS
@@ -362,7 +367,7 @@ export const Meditation = () => {
         onBack={() => navigate('/home')}
         action={
           <button
-            onClick={() => updateAudioState({ soundEnabled: !audioSettings.soundEnabled })}
+            onClick={handleSoundToggle}
             className="p-2 rounded-xl border border-light-border dark:border-dark-border text-light-muted dark:text-dark-muted hover:text-spiritual-500 transition-colors cursor-pointer"
             aria-label={audioSettings.soundEnabled ? 'Mute ambient sound' : 'Unmute ambient sound'}
           >
@@ -561,17 +566,29 @@ export const Meditation = () => {
               animate={{ height: 'auto', opacity: 1 }}
               exit={{ height: 0, opacity: 0 }}
               transition={{ duration: 0.25, ease: 'easeInOut' }}
-              className="p-5 space-y-4 bg-light-card/40 dark:bg-dark-card/40"
+              className="p-4 sm:p-5 space-y-4 bg-light-card/40 dark:bg-dark-card/40"
             >
-              {/* Sound Enabled Switch & Sound Selection Dropdown */}
+              {/* Sound Enabled Toggle & Sound Selection Dropdown */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-light-muted dark:text-dark-muted uppercase tracking-wider">
-                    {t('sound')}
-                  </label>
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-bold text-light-muted dark:text-dark-muted uppercase tracking-wider">
+                      {t('sound')}
+                    </label>
+                    <button
+                      onClick={handleSoundToggle}
+                      className={`text-xs font-extrabold px-2.5 py-0.5 rounded-full cursor-pointer transition-colors ${
+                        audioSettings.soundEnabled
+                          ? 'bg-spiritual-500 text-white'
+                          : 'bg-light-hover dark:bg-dark-hover text-light-muted dark:text-dark-muted'
+                      }`}
+                    >
+                      {audioSettings.soundEnabled ? t('on') : t('off')}
+                    </button>
+                  </div>
                   <select
                     value={audioSettings.selectedSound}
-                    onChange={(e) => updateAudioState({ selectedSound: e.target.value })}
+                    onChange={(e) => handleSoundSelect(e.target.value)}
                     className="w-full px-3.5 py-2 text-xs font-bold rounded-xl border border-light-border dark:border-dark-border bg-light-bg dark:bg-dark-bg focus:outline-none focus:ring-2 focus:ring-spiritual-500 cursor-pointer"
                   >
                     <option value="silent">{t('silent')}</option>
@@ -584,12 +601,13 @@ export const Meditation = () => {
                   </select>
                 </div>
 
+                {/* Master Volume Slider */}
                 <div className="space-y-1.5">
                   <div className="flex justify-between items-center text-xs font-bold">
                     <span className="text-light-muted dark:text-dark-muted uppercase tracking-wider">
                       {t('volume')}
                     </span>
-                    <span className="text-spiritual-500">
+                    <span className="text-spiritual-500 font-extrabold">
                       {Math.round(audioSettings.soundVolume * 100)}%
                     </span>
                   </div>
@@ -597,23 +615,31 @@ export const Meditation = () => {
                     type="range"
                     min="0"
                     max="1"
-                    step="0.05"
+                    step="0.01"
+                    aria-label="Master Meditation Sound Volume"
                     value={audioSettings.soundVolume}
-                    onChange={(e) => updateAudioState({ soundVolume: parseFloat(e.target.value) })}
+                    onChange={(e) => handleVolumeChange(e.target.value)}
                     className="w-full accent-spiritual-500 cursor-pointer"
                   />
+                  <div className="flex justify-between text-[10px] text-light-muted dark:text-dark-muted font-medium px-0.5">
+                    <span>0%</span>
+                    <span>25%</span>
+                    <span>50%</span>
+                    <span>75%</span>
+                    <span>100%</span>
+                  </div>
                 </div>
               </div>
 
               {/* Reverb Toggle & Intensity Slider */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 border-t border-light-border dark:border-dark-border">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-3 border-t border-light-border dark:border-dark-border">
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-xs font-bold text-light-text dark:text-dark-text">{t('reverb')}</p>
-                    <p className="text-[11px] text-light-muted dark:text-dark-muted">Spiritual acoustics</p>
+                    <p className="text-[11px] text-light-muted dark:text-dark-muted">Spiritual acoustic space</p>
                   </div>
                   <button
-                    onClick={() => updateAudioState({ reverbEnabled: !audioSettings.reverbEnabled })}
+                    onClick={handleReverbToggle}
                     className={`px-3 py-1 text-xs font-bold rounded-full transition-colors cursor-pointer ${
                       audioSettings.reverbEnabled
                         ? 'bg-spiritual-500 text-white'
@@ -629,8 +655,12 @@ export const Meditation = () => {
                     <span className="text-light-muted dark:text-dark-muted uppercase tracking-wider">
                       {t('reverbIntensity')}
                     </span>
-                    <span className="text-spiritual-500">
-                      {audioSettings.reverbAmount < 0.4 ? t('low') : t('high')}
+                    <span className="text-spiritual-500 font-extrabold">
+                      {audioSettings.reverbAmount <= 0.3
+                        ? t('low')
+                        : audioSettings.reverbAmount <= 0.6
+                        ? 'Medium'
+                        : t('high')}
                     </span>
                   </div>
                   <input
@@ -638,16 +668,22 @@ export const Meditation = () => {
                     min="0.1"
                     max="0.9"
                     step="0.1"
+                    aria-label="Reverb Intensity"
                     disabled={!audioSettings.reverbEnabled}
                     value={audioSettings.reverbAmount}
-                    onChange={(e) => updateAudioState({ reverbAmount: parseFloat(e.target.value) })}
+                    onChange={(e) => handleReverbAmountChange(e.target.value)}
                     className="w-full accent-spiritual-500 cursor-pointer disabled:opacity-40"
                   />
+                  <div className="flex justify-between text-[10px] text-light-muted dark:text-dark-muted font-medium px-0.5">
+                    <span>Low</span>
+                    <span>Medium</span>
+                    <span>High</span>
+                  </div>
                 </div>
               </div>
 
               {/* Completion Bell Toggle & Volume */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 border-t border-light-border dark:border-dark-border">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-3 border-t border-light-border dark:border-dark-border">
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-xs font-bold text-light-text dark:text-dark-text">{t('completionBell')}</p>
@@ -655,7 +691,10 @@ export const Meditation = () => {
                   </div>
                   <button
                     onClick={() =>
-                      updateAudioState({ completionBellEnabled: !audioSettings.completionBellEnabled })
+                      setAudioSettings((prev) => ({
+                        ...prev,
+                        completionBellEnabled: !prev.completionBellEnabled,
+                      }))
                     }
                     className={`px-3 py-1 text-xs font-bold rounded-full transition-colors cursor-pointer ${
                       audioSettings.completionBellEnabled
@@ -672,7 +711,7 @@ export const Meditation = () => {
                     <span className="text-light-muted dark:text-dark-muted uppercase tracking-wider">
                       {t('bellVolume')}
                     </span>
-                    <span className="text-spiritual-500">
+                    <span className="text-spiritual-500 font-extrabold">
                       {Math.round(audioSettings.completionBellVolume * 100)}%
                     </span>
                   </div>
@@ -681,11 +720,22 @@ export const Meditation = () => {
                     min="0.1"
                     max="1"
                     step="0.05"
+                    aria-label="Completion Bell Volume"
                     disabled={!audioSettings.completionBellEnabled}
                     value={audioSettings.completionBellVolume}
-                    onChange={(e) => updateAudioState({ completionBellVolume: parseFloat(e.target.value) })}
+                    onChange={(e) =>
+                      setAudioSettings((prev) => ({
+                        ...prev,
+                        completionBellVolume: parseFloat(e.target.value),
+                      }))
+                    }
                     className="w-full accent-spiritual-500 cursor-pointer disabled:opacity-40"
                   />
+                  <div className="flex justify-between text-[10px] text-light-muted dark:text-dark-muted font-medium px-0.5">
+                    <span>Soft</span>
+                    <span>Medium</span>
+                    <span>Full</span>
+                  </div>
                 </div>
               </div>
             </motion.div>
