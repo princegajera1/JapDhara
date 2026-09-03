@@ -13,11 +13,11 @@ export const StreakCard = () => {
       </div>
       <div>
         <h3 className="font-semibold text-sm flex items-center gap-1.5">
-          <span>{streakCount} Day Streak</span>
+          <span>{streakCount} Day{streakCount === 1 ? '' : 's'} Streak</span>
         </h3>
         <p className="text-xs text-light-muted dark:text-dark-muted">
           {streakCount > 0
-            ? 'Continuous daily flow maintained!'
+            ? 'Keep your Sadhana going'
             : 'Start your Sadhana today'}
         </p>
       </div>

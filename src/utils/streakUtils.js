@@ -1,12 +1,21 @@
 /**
  * JapDhara Streak Calculation Engine
- * Date-based consecutive day streak calculation.
+ * Integrates active calendar dates from app opens, Jaap, and meditation sessions.
  */
 
-import { getTodayDateKey } from './dateUtils';
+import { getLocalDateKey, calculateStreaks as calculateBaseStreaks } from './dateUtils';
 
-export const calculateStreaks = (recentSessions = [], meditationHistory = [], todayCount = 0) => {
-  const activeDateSet = new Set();
+export const calculateStreaks = (
+  recentSessions = [],
+  meditationHistory = [],
+  todayCount = 0,
+  storedActiveDates = []
+) => {
+  const activeDateSet = new Set(
+    Array.isArray(storedActiveDates)
+      ? storedActiveDates.filter((d) => typeof d === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(d))
+      : []
+  );
 
   // Extract date keys from Jaap sessions
   recentSessions.forEach((s) => {
@@ -15,7 +24,7 @@ export const calculateStreaks = (recentSessions = [], meditationHistory = [], to
     } else if (s.date) {
       const d = new Date(s.date);
       if (!isNaN(d.getTime())) {
-        activeDateSet.add(d.toISOString().split('T')[0]);
+        activeDateSet.add(getLocalDateKey(d));
       }
     }
   });
@@ -27,58 +36,24 @@ export const calculateStreaks = (recentSessions = [], meditationHistory = [], to
     } else if (m.timestamp || m.date) {
       const d = new Date(m.timestamp || m.date);
       if (!isNaN(d.getTime())) {
-        activeDateSet.add(d.toISOString().split('T')[0]);
+        activeDateSet.add(getLocalDateKey(d));
       }
     }
   });
 
-  // Include today if todayCount > 0
-  const todayStr = getTodayDateKey();
+  const todayKey = getLocalDateKey();
   if (todayCount > 0) {
-    activeDateSet.add(todayStr);
+    activeDateSet.add(todayKey);
   }
 
-  const sortedDates = Array.from(activeDateSet).sort();
-
-  let longestStreak = 0;
-  let currentStreak = 0;
-  let tempStreak = 0;
-
-  for (let i = 0; i < sortedDates.length; i++) {
-    if (i === 0) {
-      tempStreak = 1;
-    } else {
-      const prev = new Date(sortedDates[i - 1]);
-      const curr = new Date(sortedDates[i]);
-      const diffDays = Math.round((curr - prev) / (1000 * 60 * 60 * 24));
-
-      if (diffDays === 1) {
-        tempStreak += 1;
-      } else if (diffDays > 1) {
-        tempStreak = 1;
-      }
-    }
-
-    if (tempStreak > longestStreak) {
-      longestStreak = tempStreak;
-    }
-  }
-
-  // Calculate current streak relative to today or yesterday
-  const yesterday = new Date();
-  yesterday.setDate(yesterday.getDate() - 1);
-  const yesterdayStr = yesterday.toISOString().split('T')[0];
-
-  if (activeDateSet.has(todayStr) || activeDateSet.has(yesterdayStr)) {
-    currentStreak = tempStreak;
-  } else {
-    currentStreak = 0;
-  }
+  const { currentStreak, longestStreak, totalActiveDays } = calculateBaseStreaks(
+    Array.from(activeDateSet)
+  );
 
   return {
     currentStreak,
     longestStreak,
-    totalActiveDays: activeDateSet.size,
+    totalActiveDays,
     activeDateSet,
   };
 };

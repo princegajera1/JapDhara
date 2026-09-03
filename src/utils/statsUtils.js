@@ -3,7 +3,7 @@
  * Dynamic analytics calculated strictly from user's actual stored records.
  */
 
-import { getTodayDateKey, getWeeklyDateKeys } from './dateUtils';
+import { getTodayDateKey, getWeeklyDateKeys, getLocalDateKey } from './dateUtils';
 import { calculateCompletedMalas } from './malaUtils';
 import { calculateStreaks } from './streakUtils';
 
@@ -13,6 +13,7 @@ export const calculateAppStats = ({
   completedMalas = 0,
   recentSessions = [],
   meditationHistory = [],
+  activeDates = [],
 }) => {
   const todayKey = getTodayDateKey();
 
@@ -29,16 +30,17 @@ export const calculateAppStats = ({
 
   // 3. Meditation Totals
   const totalMeditationMinutes = meditationHistory.reduce(
-    (acc, m) => acc + (m.durationMinutes || 0),
+    (acc, m) => acc + (m.durationMinutes || (m.durationSeconds ? Math.round(m.durationSeconds / 60) : 0)),
     0
   );
   const totalMeditationSessions = meditationHistory.length;
 
   // 4. Streaks
-  const { currentStreak, longestStreak, totalActiveDays } = calculateStreaks(
+  const { currentStreak, longestStreak, totalActiveDays, activeDateSet } = calculateStreaks(
     recentSessions,
     meditationHistory,
-    todayCount
+    todayCount,
+    activeDates
   );
 
   // 5. Weekly 7-Day Breakdown (Mon to Sun)
@@ -50,7 +52,7 @@ export const calculateAppStats = ({
         dayCount += s.count || 0;
       } else if (s.date) {
         const d = new Date(s.date);
-        if (!isNaN(d.getTime()) && d.toISOString().split('T')[0] === dateKey) {
+        if (!isNaN(d.getTime()) && getLocalDateKey(d) === dateKey) {
           dayCount += s.count || 0;
         }
       }
@@ -82,16 +84,22 @@ export const calculateAppStats = ({
   let monthlyTotal = 0;
   const monthlyActiveDaysSet = new Set();
 
+  // Add all dates from activeDateSet that fall in the current month
+  activeDateSet.forEach((dKey) => {
+    const d = new Date(`${dKey}T00:00:00`);
+    if (!isNaN(d.getTime()) && d.getMonth() === currentMonth && d.getFullYear() === currentYear) {
+      monthlyActiveDaysSet.add(dKey);
+    }
+  });
+
   recentSessions.forEach((s) => {
     const d = new Date(s.timestamp || s.date);
     if (!isNaN(d.getTime()) && d.getMonth() === currentMonth && d.getFullYear() === currentYear) {
       monthlyTotal += s.count || 0;
-      monthlyActiveDaysSet.add(s.dateKey || d.toISOString().split('T')[0]);
     }
   });
 
   if (todayCount > 0) {
-    monthlyActiveDaysSet.add(todayKey);
     if (monthlyTotal < todayCount) monthlyTotal = todayCount;
   }
 
@@ -101,7 +109,7 @@ export const calculateAppStats = ({
   const monthlyMeditationMinutes = meditationHistory.reduce((acc, m) => {
     const d = new Date(m.timestamp || m.date);
     if (!isNaN(d.getTime()) && d.getMonth() === currentMonth && d.getFullYear() === currentYear) {
-      return acc + (m.durationMinutes || 0);
+      return acc + (m.durationMinutes || (m.durationSeconds ? Math.round(m.durationSeconds / 60) : 0));
     }
     return acc;
   }, 0);

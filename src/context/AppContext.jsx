@@ -1,6 +1,8 @@
-import React, { createContext, useState, useEffect } from 'react';
+import React, { createContext, useState, useEffect, useMemo } from 'react';
 import storage from '../utils/storage';
 import { INITIAL_MANTRAS } from '../data/mantras';
+import { getLocalDateKey } from '../utils/dateUtils';
+import { calculateStreaks } from '../utils/streakUtils';
 
 export const AppContext = createContext();
 
@@ -39,8 +41,6 @@ const DEFAULT_SETTINGS = {
 };
 
 export const AppProvider = ({ children }) => {
-  const getTodayDateString = () => new Date().toISOString().split('T')[0];
-
   const [isOnboardingCompleted, setIsOnboardingCompleted] = useState(() =>
     storage.getItem(KEYS.ONBOARDING, false)
   );
@@ -73,22 +73,25 @@ export const AppProvider = ({ children }) => {
     storage.getItem(KEYS.SETTINGS, DEFAULT_SETTINGS)
   );
 
-  // Active dates tracking for reliable streak calculations
+  // Active dates tracking (App Open Activity)
   const [activeDates, setActiveDatesState] = useState(() => {
     const saved = storage.getItem(KEYS.ACTIVE_DATES, []);
-    const today = getTodayDateString();
-    if (!saved.includes(today)) {
-      const updated = [...saved, today];
+    const valid = Array.isArray(saved)
+      ? saved.filter((d) => typeof d === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(d))
+      : [];
+    const today = getLocalDateKey();
+    if (!valid.includes(today)) {
+      const updated = [...valid, today];
       storage.setItem(KEYS.ACTIVE_DATES, updated);
       return updated;
     }
-    return saved;
+    return valid;
   });
 
   // Today's Jaap Count with automatic Calendar Date rollover check
   const [todayCount, setTodayCountState] = useState(() => {
     const lastDate = storage.getItem(KEYS.LAST_DATE, null);
-    const today = getTodayDateString();
+    const today = getLocalDateKey();
     if (lastDate && lastDate !== today) {
       storage.setItem(KEYS.LAST_DATE, today);
       storage.setItem(KEYS.TODAY_JAAP, 0);
@@ -113,9 +116,9 @@ export const AppProvider = ({ children }) => {
     storage.getItem(KEYS.HISTORY, storage.getItem('japdhara_recent_activity', []))
   );
 
-  // Mark today as active in storage
+  // Automatically ensure today is marked active in state & storage
   const markTodayActive = () => {
-    const today = getTodayDateString();
+    const today = getLocalDateKey();
     setActiveDatesState((prev) => {
       if (!prev.includes(today)) {
         const updated = [...prev, today];
@@ -125,6 +128,11 @@ export const AppProvider = ({ children }) => {
       return prev;
     });
   };
+
+  // Dynamically calculate streaks from central state
+  const { currentStreak, longestStreak } = useMemo(() => {
+    return calculateStreaks(recentSessions, meditationHistory, todayCount, activeDates);
+  }, [recentSessions, meditationHistory, todayCount, activeDates]);
 
   // Sync states with storage
   useEffect(() => {
@@ -174,13 +182,17 @@ export const AppProvider = ({ children }) => {
   }, [completedMalas]);
 
   useEffect(() => {
+    storage.setItem(KEYS.STREAK, currentStreak);
+  }, [currentStreak]);
+
+  useEffect(() => {
     storage.setItem(KEYS.HISTORY, recentSessions);
     storage.setItem('japdhara_recent_activity', recentSessions);
   }, [recentSessions]);
 
   // Master Chant Recorder: Uses functional state updates to prevent stale closure race conditions
   const recordChant = (amount = 1) => {
-    const today = getTodayDateString();
+    const today = getLocalDateKey();
     storage.setItem(KEYS.LAST_DATE, today);
     markTodayActive();
 
@@ -232,7 +244,7 @@ export const AppProvider = ({ children }) => {
         hour: '2-digit',
         minute: '2-digit',
       }),
-      dateKey: getTodayDateString(),
+      dateKey: getLocalDateKey(),
       durationSeconds: durationSeconds,
       durationMinutes: durationMinutes,
       mode: sessionData.mode || 'Silent Meditation',
@@ -282,7 +294,7 @@ export const AppProvider = ({ children }) => {
     const parsed = parseInt(count, 10);
     if (!isNaN(parsed) && parsed >= 0) {
       setTodayCountState(parsed);
-      storage.setItem(KEYS.LAST_DATE, getTodayDateString());
+      storage.setItem(KEYS.LAST_DATE, getLocalDateKey());
     }
   };
 
@@ -315,7 +327,7 @@ export const AppProvider = ({ children }) => {
         hour: '2-digit',
         minute: '2-digit',
       }),
-      dateKey: getTodayDateString(),
+      dateKey: getLocalDateKey(),
       mantraTitle: session.mantraTitle || currentMantra.title,
       sanskrit: session.sanskrit || currentMantra.sanskrit,
       count: session.count,
@@ -370,6 +382,8 @@ export const AppProvider = ({ children }) => {
         incrementTodayCount,
         recordChant,
         activeDates,
+        streakCount: currentStreak,
+        longestStreak,
         recentSessions,
         setRecentSessions: setRecentSessionsState,
         addJaapSession,

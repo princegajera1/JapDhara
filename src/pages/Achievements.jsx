@@ -45,6 +45,9 @@ export const Achievements = () => {
     completedMalas,
     recentSessions,
     meditationHistory,
+    streakCount,
+    longestStreak,
+    activeDates = [],
   } = useApp();
 
   const [activeCategory, setActiveCategory] = useState('All');
@@ -63,43 +66,13 @@ export const Achievements = () => {
     const totalMalas = Math.max(completedMalas, historyMalaSum);
 
     const totalMeditationMins = meditationHistory.reduce(
-      (acc, m) => acc + (m.durationMinutes || 0),
+      (acc, m) => acc + (m.durationMinutes || (m.durationSeconds ? Math.round(m.durationSeconds / 60) : 0)),
       0
     );
     const totalMeditationCount = meditationHistory.length;
 
-    // Unique active calendar days & streak
-    const activeDates = new Set();
-    recentSessions.forEach((s) => {
-      if (s.date) {
-        const d = new Date(s.date);
-        if (!isNaN(d.getTime())) activeDates.add(d.toISOString().split('T')[0]);
-      }
-    });
-    meditationHistory.forEach((m) => {
-      if (m.dateKey) activeDates.add(m.dateKey);
-    });
-    if (todayCount > 0) activeDates.add(new Date().toISOString().split('T')[0]);
-
-    const sortedDates = Array.from(activeDates).sort();
-    let longestStreak = 0;
-    let tempStreak = 0;
-
-    for (let i = 0; i < sortedDates.length; i++) {
-      if (i === 0) {
-        tempStreak = 1;
-      } else {
-        const prev = new Date(sortedDates[i - 1]);
-        const curr = new Date(sortedDates[i]);
-        const diffDays = Math.round((curr - prev) / (1000 * 60 * 60 * 24));
-        if (diffDays === 1) tempStreak += 1;
-        else if (diffDays > 1) tempStreak = 1;
-      }
-      if (tempStreak > longestStreak) longestStreak = tempStreak;
-    }
-
-    const uniqueMantras = new Set(recentSessions.map((s) => s.mantraTitle)).size;
-    const completedGoalsCount = todayCount >= dailyGoal ? 1 : 0;
+    const uniqueMantras = totalJaap >= 1 ? new Set(recentSessions.map((s) => s.mantraTitle)).size || 1 : 0;
+    const completedGoalsCount = todayCount >= dailyGoal && todayCount > 0 ? 1 : 0;
 
     return {
       totalJaap,
@@ -108,13 +81,13 @@ export const Achievements = () => {
       totalMeditationCount,
       longestStreak,
       completedGoalsCount,
-      totalActiveDays: activeDates.size,
+      totalActiveDays: activeDates.length,
       jaapSessionsCount: recentSessions.length,
-      uniqueMantrasCount: Math.max(1, uniqueMantras),
+      uniqueMantrasCount: uniqueMantras,
     };
-  }, [todayCount, dailyGoal, completedMalas, recentSessions, meditationHistory]);
+  }, [todayCount, dailyGoal, completedMalas, recentSessions, meditationHistory, activeDates, longestStreak]);
 
-  // Evaluate all 77 achievement items dynamically
+  // Evaluate dynamic achievement items
   const evaluatedAchievements = useMemo(() => {
     return evaluateAchievements(statsData);
   }, [statsData]);

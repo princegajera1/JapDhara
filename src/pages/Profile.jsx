@@ -33,6 +33,8 @@ export const Profile = () => {
     completedMalas,
     recentSessions,
     meditationHistory,
+    streakCount,
+    longestStreak,
     activeDates = [],
   } = useApp();
 
@@ -45,8 +47,6 @@ export const Profile = () => {
     totalJaap,
     totalMalas,
     totalMeditationLabel,
-    currentStreak,
-    longestStreak,
     unlockedAchievementsCount,
     totalAchievementsCount,
   } = useMemo(() => {
@@ -68,53 +68,17 @@ export const Profile = () => {
         ? `${totalMeditationSecs} sec`
         : `${Math.floor(totalMeditationSecs / 60)} min`;
 
-    // Streak calculation using local active calendar dates
-    const dateSet = new Set(activeDates);
-    recentSessions.forEach((s) => {
-      if (s.dateKey) dateSet.add(s.dateKey);
-      else if (s.date) {
-        const d = new Date(s.date);
-        if (!isNaN(d.getTime())) dateSet.add(d.toISOString().split('T')[0]);
-      }
-    });
-    meditationHistory.forEach((m) => {
-      if (m.dateKey) dateSet.add(m.dateKey);
-    });
-
-    const todayStr = new Date().toISOString().split('T')[0];
-    dateSet.add(todayStr); // Opening app today counts for today's active streak
-
-    const sortedDates = Array.from(dateSet).sort();
-    let currentStreak = 0;
-    let longestStreak = 0;
-    let tempStreak = 0;
-
-    for (let i = 0; i < sortedDates.length; i++) {
-      if (i === 0) {
-        tempStreak = 1;
-      } else {
-        const prev = new Date(sortedDates[i - 1]);
-        const curr = new Date(sortedDates[i]);
-        const diffDays = Math.round((curr - prev) / (1000 * 60 * 60 * 24));
-        if (diffDays === 1) tempStreak += 1;
-        else if (diffDays > 1) tempStreak = 1;
-      }
-      if (tempStreak > longestStreak) longestStreak = tempStreak;
-    }
-
-    currentStreak = tempStreak > 0 ? tempStreak : 1;
-
-    // Evaluate dynamic achievements using global 77 dataset
+    // Evaluate dynamic achievements using global dataset
     const statsData = {
       totalJaap,
       totalMalas,
       totalMeditationMins: Math.round(totalMeditationSecs / 60),
       totalMeditationCount: meditationHistory.length,
       longestStreak,
-      completedGoalsCount: todayCount >= dailyGoal ? 1 : 0,
-      totalActiveDays: dateSet.size,
+      completedGoalsCount: todayCount >= dailyGoal && todayCount > 0 ? 1 : 0,
+      totalActiveDays: activeDates.length,
       jaapSessionsCount: recentSessions.length,
-      uniqueMantrasCount: 1,
+      uniqueMantrasCount: totalJaap >= 1 ? new Set(recentSessions.map((s) => s.mantraTitle)).size || 1 : 0,
     };
 
     const evaluated = evaluateAchievements(statsData);
@@ -124,12 +88,10 @@ export const Profile = () => {
       totalJaap,
       totalMalas,
       totalMeditationLabel,
-      currentStreak,
-      longestStreak,
       unlockedAchievementsCount,
       totalAchievementsCount: evaluated.length,
     };
-  }, [todayCount, dailyGoal, completedMalas, recentSessions, meditationHistory, activeDates]);
+  }, [todayCount, dailyGoal, completedMalas, recentSessions, meditationHistory, activeDates, longestStreak]);
 
   const handleSaveProfile = (e) => {
     e.preventDefault();
@@ -239,7 +201,7 @@ export const Profile = () => {
               <Flame className="w-5 h-5" />
             </div>
             <span className="text-[10px] uppercase font-bold text-light-muted dark:text-dark-muted">Current Streak</span>
-            <p className="text-xl font-black text-amber-500">{currentStreak} Day{currentStreak === 1 ? '' : 's'}</p>
+            <p className="text-xl font-black text-amber-500">{streakCount} Day{streakCount === 1 ? '' : 's'}</p>
           </Card>
 
           <Card className="p-4 flex flex-col items-center text-center space-y-1">
