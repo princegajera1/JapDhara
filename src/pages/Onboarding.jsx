@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowRight, ArrowLeft } from 'lucide-react';
 import useApp from '../hooks/useApp';
 import Button from '../components/ui/Button';
 
@@ -34,14 +33,15 @@ export const Onboarding = () => {
   const isLastStep = currentStep === SLIDES.length - 1;
   const isFirstStep = currentStep === 0;
 
-  const handleFinish = () => {
-    // Explicitly set localStorage key as requested by Phase 3 requirement
+  const handleFinish = (e) => {
+    if (e) e.stopPropagation();
     localStorage.setItem('japdhara_onboarding_completed', 'true');
     completeOnboarding();
     navigate('/home', { replace: true });
   };
 
-  const handleNext = () => {
+  const handleNext = (e) => {
+    if (e) e.stopPropagation();
     if (isLastStep) {
       handleFinish();
     } else {
@@ -49,9 +49,17 @@ export const Onboarding = () => {
     }
   };
 
-  const handleBack = () => {
+  const handleBack = (e) => {
+    if (e) e.stopPropagation();
     if (!isFirstStep) {
       setCurrentStep((prev) => Math.max(prev - 1, 0));
+    }
+  };
+
+  const handleKeyDownContent = (e) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      handleNext();
     }
   };
 
@@ -62,7 +70,7 @@ export const Onboarding = () => {
   };
 
   return (
-    <div className="min-h-screen flex flex-col justify-between p-6 bg-light-bg dark:bg-dark-bg text-light-text dark:text-dark-text max-w-lg mx-auto transition-colors duration-200">
+    <div className="min-h-screen flex flex-col justify-between p-4 sm:p-6 bg-light-bg dark:bg-dark-bg text-light-text dark:text-dark-text max-w-lg mx-auto transition-colors duration-200">
       {/* Top Header: Brand & Skip Button */}
       <div className="flex items-center justify-between pt-2">
         <div className="flex items-center gap-2">
@@ -71,50 +79,65 @@ export const Onboarding = () => {
         </div>
         <button
           onClick={handleFinish}
-          className="text-xs font-semibold text-light-muted dark:text-dark-muted hover:text-spiritual-500 transition-colors p-2 rounded-lg"
+          className="text-xs font-semibold text-light-muted dark:text-dark-muted hover:text-spiritual-500 transition-colors p-2 rounded-lg cursor-pointer"
           aria-label="Skip onboarding"
         >
           Skip
         </button>
       </div>
 
-      {/* Main Slide Content Area */}
-      <div className="my-auto py-8">
-        <AnimatePresence mode="wait">
-          <motion.div
-            key={currentStep}
-            variants={slideVariants}
-            initial="hidden"
-            animate="visible"
-            exit="exit"
-            transition={{ duration: 0.3, ease: 'easeOut' }}
-            className="flex flex-col items-center text-center space-y-6 px-4"
-          >
-            {/* Visual Icon / Symbol */}
-            <div className="w-24 h-24 rounded-full bg-spiritual-500/10 border border-spiritual-500/20 flex items-center justify-center text-5xl shadow-soft-md animate-breathe-slow">
-              {SLIDES[currentStep].symbol}
-            </div>
+      {/* Main Slide Content Area — Clickable/Tappable Center Content */}
+      <div className="my-auto py-6">
+        <div
+          role="button"
+          tabIndex={0}
+          onClick={handleNext}
+          onKeyDown={handleKeyDownContent}
+          aria-label={`Slide ${currentStep + 1}: ${SLIDES[currentStep].title}. Tap to advance next.`}
+          className="cursor-pointer touch-manipulation focus:outline-none focus-visible:ring-2 focus-visible:ring-spiritual-500/50 rounded-3xl p-4 transition-transform active:scale-[0.99] select-none"
+        >
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={currentStep}
+              variants={slideVariants}
+              initial="hidden"
+              animate="visible"
+              exit="exit"
+              transition={{ duration: 0.25, ease: 'easeOut' }}
+              className="flex flex-col items-center text-center space-y-6"
+            >
+              {/* Visual Icon / Symbol */}
+              <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-full bg-spiritual-500/10 border border-spiritual-500/20 flex items-center justify-center text-5xl sm:text-6xl shadow-soft-md animate-breathe-slow">
+                {SLIDES[currentStep].symbol}
+              </div>
 
-            {/* Title & Description */}
-            <div className="space-y-3">
-              <h1 className="text-2xl md:text-3xl font-bold tracking-tight">
-                {SLIDES[currentStep].title}
-              </h1>
-              <p className="text-sm md:text-base text-light-muted dark:text-dark-muted max-w-xs mx-auto leading-relaxed">
-                {SLIDES[currentStep].description}
-              </p>
-            </div>
-          </motion.div>
-        </AnimatePresence>
+              {/* Title & Description */}
+              <div className="space-y-3">
+                <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">
+                  {SLIDES[currentStep].title}
+                </h1>
+                <p className="text-sm sm:text-base text-light-muted dark:text-dark-muted max-w-xs mx-auto leading-relaxed">
+                  {SLIDES[currentStep].description}
+                </p>
+                <p className="text-[11px] font-semibold text-spiritual-500/80 pt-1">
+                  (Tap card or button to continue)
+                </p>
+              </div>
+            </motion.div>
+          </AnimatePresence>
+        </div>
 
         {/* 3 Pagination Dots */}
-        <div className="flex items-center justify-center gap-2 mt-8" aria-label="Slide indicators">
+        <div className="flex items-center justify-center gap-2 mt-6" aria-label="Slide indicators">
           {SLIDES.map((_, index) => (
             <button
               key={index}
-              onClick={() => setCurrentStep(index)}
+              onClick={(e) => {
+                e.stopPropagation();
+                setCurrentStep(index);
+              }}
               aria-label={`Go to slide ${index + 1}`}
-              className={`h-2.5 rounded-full transition-all duration-300 ${
+              className={`h-2.5 rounded-full transition-all duration-300 cursor-pointer ${
                 index === currentStep
                   ? 'w-8 bg-spiritual-500'
                   : 'w-2.5 bg-light-border dark:bg-dark-border hover:bg-spiritual-300'
@@ -166,8 +189,11 @@ export const Onboarding = () => {
           <p className="text-center text-xs text-light-muted dark:text-dark-muted pt-2">
             You have already completed onboarding.{' '}
             <button
-              onClick={() => navigate('/home')}
-              className="text-spiritual-500 underline font-medium"
+              onClick={(e) => {
+                e.stopPropagation();
+                navigate('/home');
+              }}
+              className="text-spiritual-500 underline font-medium cursor-pointer"
             >
               Return Home
             </button>

@@ -6,9 +6,10 @@ import useApp from '../../hooks/useApp';
 const AVATAR_CHOICES = ['🧘', 'ॐ', '🙏', '☸️', '✨', '🌸', '🌿', '🪷'];
 
 export const ProfileSetupModal = () => {
-  const { profile, updateProfile } = useApp();
+  const { profile, updateProfile, isOnboardingCompleted } = useApp();
 
-  const isOpen = !profile?.hasCompletedSetup;
+  // Show profile setup modal ONLY after onboarding is finished AND if profile setup has not been completed
+  const isOpen = Boolean(isOnboardingCompleted) && !Boolean(profile?.hasCompletedSetup);
 
   const [name, setName] = useState(profile?.name || 'Seeker');
   const [avatar, setAvatar] = useState(profile?.avatar || '🧘');

@@ -216,6 +216,15 @@ export const Meditation = () => {
 
   const totalSessionsCount = meditationHistory.length;
 
+  // Chronologically sorted meditation sessions (newest first)
+  const sortedMeditationHistory = useMemo(() => {
+    return [...meditationHistory].sort((a, b) => {
+      const timeA = new Date(a.timestamp || a.date || 0).getTime();
+      const timeB = new Date(b.timestamp || b.date || 0).getTime();
+      return timeB - timeA;
+    });
+  }, [meditationHistory]);
+
   return (
     <div className="space-y-6 max-w-2xl mx-auto pb-12">
       {/* Toast Notification for Completion */}
@@ -447,17 +456,22 @@ export const Meditation = () => {
           Recent Meditation Sessions
         </h3>
 
-        {meditationHistory && meditationHistory.length > 0 ? (
+        {sortedMeditationHistory && sortedMeditationHistory.length > 0 ? (
           <Card className="divide-y divide-light-border dark:divide-dark-border">
-            {meditationHistory.slice(0, 5).map((session) => (
-              <div key={session.id} className="p-4 flex items-center justify-between">
+            {sortedMeditationHistory.map((session) => (
+              <div key={session.id} className="p-4 flex items-center justify-between gap-4">
                 <div className="space-y-0.5">
-                  <p className="font-semibold text-sm">{session.mode}</p>
+                  <div className="flex items-center gap-2">
+                    <p className="font-semibold text-sm">{session.mode || 'Silent Meditation'}</p>
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+                      Completed
+                    </span>
+                  </div>
                   <p className="text-xs text-light-muted dark:text-dark-muted">{session.date}</p>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 shrink-0">
                   <span className="text-xs font-bold text-spiritual-500 px-2.5 py-1 rounded-full bg-spiritual-500/10">
-                    {session.durationMinutes} minutes
+                    {session.durationMinutes} min
                   </span>
                   <CheckCircle2 className="w-4 h-4 text-emerald-500" />
                 </div>
