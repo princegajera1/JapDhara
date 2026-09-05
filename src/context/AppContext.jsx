@@ -5,7 +5,6 @@ import { getLocalDateKey } from '../utils/dateUtils';
 import { calculateStreaks } from '../utils/streakUtils';
 import { getTranslation } from '../data/translations';
 import { getMalaProgressDetails } from '../utils/malaUtils';
-import reminderScheduler from '../utils/reminderScheduler';
 
 export const AppContext = createContext();
 
@@ -40,8 +39,6 @@ const DEFAULT_SETTINGS = {
   soundType: 'bead',
   vibrationEnabled: true,
   hapticIntensity: 'light',
-  reminderTime: '06:00:00',
-  remindersEnabled: false,
   language: 'en',
 };
 
@@ -75,9 +72,10 @@ export const AppProvider = ({ children }) => {
   );
 
   const [settings, setSettingsState] = useState(() => {
+    // One-time migration: Clean up obsolete reminder keys
+    storage.removeItem('japdhara_last_notified_date');
     const saved = storage.getItem(KEYS.SETTINGS, DEFAULT_SETTINGS);
-    // Remove obsolete background properties if present
-    const { jaapBackground, customWallpaperUrl, ...cleanSettings } = saved || {};
+    const { jaapBackground, customWallpaperUrl, reminderTime, remindersEnabled, ...cleanSettings } = saved || {};
     return { ...DEFAULT_SETTINGS, ...cleanSettings };
   });
 
@@ -180,7 +178,6 @@ export const AppProvider = ({ children }) => {
 
   useEffect(() => {
     storage.setItem(KEYS.SETTINGS, settings);
-    reminderScheduler.init(settings);
   }, [settings]);
 
   useEffect(() => {

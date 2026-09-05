@@ -15,7 +15,6 @@ import Meditation from './pages/Meditation';
 import Stats from './pages/Stats';
 import History from './pages/History';
 import Achievements from './pages/Achievements';
-import Reminders from './pages/Reminders';
 import CalendarPage from './pages/Calendar';
 import Profile from './pages/Profile';
 import Settings from './pages/Settings';
@@ -45,7 +44,6 @@ export function App() {
               <Route path="/statistics" element={<Stats />} />
               <Route path="/history" element={<History />} />
               <Route path="/achievements" element={<Achievements />} />
-              <Route path="/reminders" element={<Reminders />} />
               <Route path="/calendar" element={<CalendarPage />} />
               <Route path="/profile" element={<Profile />} />
               <Route path="/settings" element={<Settings />} />

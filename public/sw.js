@@ -32,23 +32,6 @@ self.addEventListener('activate', (event) => {
   self.clients.claim();
 });
 
-// Notification Click Event - Focus or open JapDhara window
-self.addEventListener('notificationclick', (event) => {
-  event.notification.close();
-  event.waitUntil(
-    clients.matchAll({ type: 'window', includeUncontrolled: true }).then((windowClients) => {
-      for (let client of windowClients) {
-        if ('focus' in client) {
-          return client.focus();
-        }
-      }
-      if (clients.openWindow) {
-        return clients.openWindow('/');
-      }
-    })
-  );
-});
-
 // Fetch Event - Handle navigation and asset requests safely
 self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return;

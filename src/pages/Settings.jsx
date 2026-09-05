@@ -6,7 +6,6 @@ import {
   Volume2,
   VolumeX,
   Vibrate,
-  Bell,
   Download,
   Upload,
   RotateCcw,
@@ -198,7 +197,7 @@ export const Settings = () => {
 
       <PageHeader
         title={t('settings')}
-        subtitle="Manage app installation, language, theme, audio, and reminders."
+        subtitle="Manage app installation, language, theme, and audio preferences."
         showBack
         onBack={() => navigate('/home')}
       />
@@ -420,33 +419,7 @@ export const Settings = () => {
         </Card>
       </div>
 
-      {/* 5. Notifications & Reminders Section */}
-      <div className="space-y-3">
-        <h3 className="text-xs font-semibold uppercase tracking-wider text-light-muted dark:text-dark-muted">
-          {t('reminders')}
-        </h3>
-        <Card className="p-4 flex items-center justify-between">
-          <div className="flex items-center gap-3.5">
-            <div className="p-3 rounded-2xl bg-spiritual-500/10 text-spiritual-500">
-              <Bell className="w-5 h-5" />
-            </div>
-            <div>
-              <p className="font-bold text-sm">Daily Chanting Reminders</p>
-              <p className="text-xs text-light-muted dark:text-dark-muted mt-0.5">
-                {settings?.remindersEnabled
-                  ? `Scheduled daily at ${settings.reminderTime || '06:00:00'}`
-                  : 'Reminders disabled'}
-              </p>
-            </div>
-          </div>
-
-          <Button variant="secondary" size="sm" onClick={() => navigate('/reminders')}>
-            Configure
-          </Button>
-        </Card>
-      </div>
-
-      {/* 6. Jaap Preferences Section */}
+      {/* 5. Jaap Preferences Section */}
       <div className="space-y-3">
         <h3 className="text-xs font-semibold uppercase tracking-wider text-light-muted dark:text-dark-muted">
           Jaap Preferences

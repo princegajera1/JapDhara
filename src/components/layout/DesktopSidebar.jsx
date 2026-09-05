@@ -9,7 +9,6 @@ import {
   BarChart3,
   History,
   Trophy,
-  Bell,
   Calendar,
   User,
   Settings,
@@ -27,7 +26,6 @@ const NAV_ITEMS = [
   { path: '/calendar', key: 'calendar', defaultLabel: 'Calendar', icon: Calendar },
   { path: '/history', key: 'history', defaultLabel: 'History', icon: History },
   { path: '/achievements', key: 'achievements', defaultLabel: 'Achievements', icon: Trophy },
-  { path: '/reminders', key: 'reminders', defaultLabel: 'Reminders', icon: Bell },
   { path: '/profile', key: 'profile', defaultLabel: 'Profile', icon: User },
   { path: '/settings', key: 'settings', defaultLabel: 'Settings', icon: Settings },
 ];
