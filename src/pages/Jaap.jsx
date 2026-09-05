@@ -55,6 +55,7 @@ export const Jaap = () => {
   const [floatingItems, setFloatingItems] = useState([]);
 
   const prevCountRef = useRef(todayCount);
+  const tapAnimationTimerRef = useRef(null);
 
   const availableMantras = [...INITIAL_MANTRAS, ...customMantras];
 
@@ -64,6 +65,12 @@ export const Jaap = () => {
 
   const percentage = Math.min(100, Math.round((todayCount / dailyGoal) * 100));
   const isGoalComplete = todayCount >= dailyGoal;
+
+  useEffect(() => {
+    return () => {
+      if (tapAnimationTimerRef.current) clearTimeout(tapAnimationTimerRef.current);
+    };
+  }, []);
 
   // Single reliable click handler preventing mobile double counting
   const handleChant = (e) => {
@@ -85,7 +92,8 @@ export const Jaap = () => {
 
     // Visual Animation
     setTapAnimation(true);
-    setTimeout(() => setTapAnimation(false), 120);
+    if (tapAnimationTimerRef.current) clearTimeout(tapAnimationTimerRef.current);
+    tapAnimationTimerRef.current = setTimeout(() => setTapAnimation(false), 120);
 
     // Floating +1 particle animation
     const newItem = { id: Date.now() + Math.random(), label: '+1' };
@@ -105,6 +113,10 @@ export const Jaap = () => {
   // Keyboard spacebar listener
   useEffect(() => {
     const handleKeyDown = (e) => {
+      const target = e.target;
+      const isInput = target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT' || target.isContentEditable);
+      if (isInput) return;
+
       if (
         e.code === 'Space' &&
         !isResetModalOpen &&

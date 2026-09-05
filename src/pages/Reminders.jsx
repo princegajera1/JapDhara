@@ -6,6 +6,7 @@ import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
 import Toast from '../components/common/Toast';
 import useApp from '../hooks/useApp';
+import reminderScheduler from '../utils/reminderScheduler';
 
 export const Reminders = () => {
   const navigate = useNavigate();
@@ -40,27 +41,23 @@ export const Reminders = () => {
   }, [timeWithSeconds]);
 
   const handleRequestPermission = async () => {
-    if (typeof window === 'undefined' || !('Notification' in window)) {
+    const permission = await reminderScheduler.requestPermission();
+    setNotificationPermission(permission);
+    if (permission === 'granted') {
+      const newSettings = { ...settings, remindersEnabled: true };
+      updateSettings(newSettings);
+      reminderScheduler.scheduleReminder(newSettings);
+      setToastType('success');
+      setToastMessage('Notification permissions granted! Daily reminders enabled.');
+    } else if (permission === 'denied') {
+      const newSettings = { ...settings, remindersEnabled: false };
+      updateSettings(newSettings);
+      reminderScheduler.cancelReminder();
+      setToastType('error');
+      setToastMessage('Notification permission denied by browser.');
+    } else if (permission === 'unsupported') {
       setToastType('error');
       setToastMessage('Browser notifications are not supported on this device.');
-      return;
-    }
-
-    try {
-      const permission = await Notification.requestPermission();
-      setNotificationPermission(permission);
-      if (permission === 'granted') {
-        updateSettings({ remindersEnabled: true });
-        setToastType('success');
-        setToastMessage('Notification permissions granted! Daily reminders enabled.');
-      } else if (permission === 'denied') {
-        updateSettings({ remindersEnabled: false });
-        setToastType('error');
-        setToastMessage('Notification permission denied by browser.');
-      }
-    } catch (e) {
-      setToastType('error');
-      setToastMessage('Failed to request notification permission.');
     }
   };
 

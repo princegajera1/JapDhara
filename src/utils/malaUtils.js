@@ -18,6 +18,12 @@ export const calculateCurrentBead = (totalJaap) => {
   return ((count - 1) % MALA_BEADS) + 1;
 };
 
+// Resets in-progress mala count while preserving completed malas
+export const resetCurrentMalaProgress = (totalJaap) => {
+  const count = Math.max(0, parseInt(totalJaap, 10) || 0);
+  return count - (count % MALA_BEADS);
+};
+
 // Returns object with completed malas, current bead (1..108), and percentage complete of current mala
 export const getMalaProgressDetails = (totalJaap) => {
   const count = Math.max(0, parseInt(totalJaap, 10) || 0);
@@ -31,3 +37,4 @@ export const getMalaProgressDetails = (totalJaap) => {
     percentage,
   };
 };
+

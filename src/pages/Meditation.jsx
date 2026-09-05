@@ -27,6 +27,7 @@ import EmptyState from '../components/common/EmptyState';
 import useApp from '../hooks/useApp';
 import storage from '../utils/storage';
 import meditationAudioManager from '../utils/MeditationAudioManager';
+import { getLocalDateKey } from '../utils/dateUtils';
 
 const STORAGE_KEY_AUDIO = 'japdhara_meditation_audio';
 
@@ -200,7 +201,7 @@ export const Meditation = () => {
     };
   }, [isRunning, isPaused, selectedDuration]);
 
-  // Breathing cycle timer for Breath Focus mode
+  // Breathing cycle timer for Breath Focus mode with phase-specific timing
   useEffect(() => {
     if (selectedMode.id !== 'breath' || !isRunning || isPaused) return;
 
@@ -212,14 +213,23 @@ export const Meditation = () => {
     ];
 
     let phaseIndex = 0;
+    let timerId = null;
     setBreathPhase(phases[0].text);
 
-    const interval = setInterval(() => {
-      phaseIndex = (phaseIndex + 1) % phases.length;
-      setBreathPhase(phases[phaseIndex].text);
-    }, 4000);
+    const scheduleNextPhase = () => {
+      const currentDuration = phases[phaseIndex].duration;
+      timerId = setTimeout(() => {
+        phaseIndex = (phaseIndex + 1) % phases.length;
+        setBreathPhase(phases[phaseIndex].text);
+        scheduleNextPhase();
+      }, currentDuration);
+    };
 
-    return () => clearInterval(interval);
+    scheduleNextPhase();
+
+    return () => {
+      if (timerId) clearTimeout(timerId);
+    };
   }, [selectedMode, isRunning, isPaused]);
 
   // Handle Page Visibility Changes (App Background/Tab Change)
@@ -325,7 +335,7 @@ export const Meditation = () => {
   };
 
   // Calculate dynamic stats from saved history
-  const todayKey = new Date().toISOString().split('T')[0];
+  const todayKey = getLocalDateKey();
 
   const todaySessions = useMemo(() => {
     return meditationHistory.filter((s) => s.dateKey === todayKey);

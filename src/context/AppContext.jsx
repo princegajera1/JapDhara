@@ -4,6 +4,8 @@ import { INITIAL_MANTRAS } from '../data/mantras';
 import { getLocalDateKey } from '../utils/dateUtils';
 import { calculateStreaks } from '../utils/streakUtils';
 import { getTranslation } from '../data/translations';
+import { getMalaProgressDetails } from '../utils/malaUtils';
+import reminderScheduler from '../utils/reminderScheduler';
 
 export const AppContext = createContext();
 
@@ -119,13 +121,10 @@ export const AppProvider = ({ children }) => {
     return storage.getItem(KEYS.TODAY_JAAP, storage.getItem('japdhara_today_count', 0));
   });
 
-  const [completedMalas, setCompletedMalasState] = useState(() =>
-    storage.getItem(KEYS.COMPLETED_MALAS, 0)
-  );
-
-  const [currentBead, setCurrentBeadState] = useState(() =>
-    storage.getItem(KEYS.MALA_PROGRESS, 1)
-  );
+  // Derive completed malas and current bead directly from single source of truth: todayCount
+  const { completedMalas, currentBead } = useMemo(() => {
+    return getMalaProgressDetails(todayCount);
+  }, [todayCount]);
 
   const [recentSessions, setRecentSessionsState] = useState(() =>
     storage.getItem(KEYS.HISTORY, storage.getItem('japdhara_recent_activity', []))
@@ -149,7 +148,7 @@ export const AppProvider = ({ children }) => {
     return calculateStreaks(recentSessions, meditationHistory, todayCount, activeDates);
   }, [recentSessions, meditationHistory, todayCount, activeDates]);
 
-  // Sync states with storage
+  // Sync states with storage & scheduler
   useEffect(() => {
     storage.setItem(KEYS.ONBOARDING, isOnboardingCompleted);
   }, [isOnboardingCompleted]);
@@ -181,6 +180,7 @@ export const AppProvider = ({ children }) => {
 
   useEffect(() => {
     storage.setItem(KEYS.SETTINGS, settings);
+    reminderScheduler.init(settings);
   }, [settings]);
 
   useEffect(() => {
@@ -211,19 +211,8 @@ export const AppProvider = ({ children }) => {
     storage.setItem(KEYS.LAST_DATE, today);
     markTodayActive();
 
-    // 1. Update Today's Count functionally
+    // 1. Update Today's Count functionally (Single source of truth)
     setTodayCountState((prevCount) => prevCount + amount);
-
-    // 2. Update Digital Mala Bead Progress functionally
-    setCurrentBeadState((prevBead) => {
-      let newBead = prevBead + amount;
-      if (newBead > 108) {
-        const extraMalas = Math.floor((newBead - 1) / 108);
-        setCompletedMalasState((prevMalas) => prevMalas + extraMalas);
-        newBead = ((newBead - 1) % 108) + 1;
-      }
-      return newBead;
-    });
 
     // 3. Append to Session History
     const newSession = {
@@ -315,15 +304,15 @@ export const AppProvider = ({ children }) => {
 
   const setCurrentBead = (bead) => {
     const parsed = parseInt(bead, 10);
-    if (!isNaN(parsed) && parsed >= 1 && parsed <= 108) {
-      setCurrentBeadState(parsed);
+    if (!isNaN(parsed) && parsed >= 0 && parsed <= 108) {
+      setTodayCountState((completedMalas * 108) + parsed);
     }
   };
 
   const setCompletedMalas = (count) => {
     const parsed = parseInt(count, 10);
     if (!isNaN(parsed) && parsed >= 0) {
-      setCompletedMalasState(parsed);
+      setTodayCountState((parsed * 108) + (todayCount % 108));
     }
   };
 

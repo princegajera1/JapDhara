@@ -32,6 +32,7 @@ import storage from '../utils/storage';
 import { playSpiritualSound } from '../utils/audioUtils';
 import { triggerHaptic } from '../utils/hapticUtils';
 import { APP_VERSION } from '../utils/constants';
+import { validateBackupPayload } from '../utils/backupUtils';
 
 export const Settings = () => {
   const navigate = useNavigate();
@@ -109,7 +110,7 @@ export const Settings = () => {
     }
   };
 
-  // Robust JSON Data Import Audit & Fix
+  // Robust JSON Data Import Audit & Validation Fix
   const handleImportData = (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -139,23 +140,12 @@ export const Settings = () => {
         }
 
         const json = JSON.parse(text);
+        const data = validateBackupPayload(json);
 
-        if (!json || typeof json !== 'object') {
-          throw new Error('Invalid JSON format.');
-        }
-
-        const data = json.data || json;
-
-        if (typeof data !== 'object') {
-          throw new Error('No valid JapDhara data payload found.');
-        }
-
-        if (data.dailyGoal) storage.setItem('japdhara_daily_goal', data.dailyGoal);
+        if (data.dailyGoal !== undefined) storage.setItem('japdhara_daily_goal', data.dailyGoal);
         if (data.currentMantra) storage.setItem('japdhara_selected_mantra', data.currentMantra);
         if (data.profile) storage.setItem('japdhara_user_profile', data.profile);
         if (data.todayCount !== undefined) storage.setItem('japdhara_today_jaap', data.todayCount);
-        if (data.currentBead) storage.setItem('japdhara_mala_progress', data.currentBead);
-        if (data.completedMalas !== undefined) storage.setItem('japdhara_completed_malas', data.completedMalas);
         if (data.favorites) storage.setItem('japdhara_favorite_mantras', data.favorites);
         if (data.customMantras) storage.setItem('japdhara_custom_mantras', data.customMantras);
         if (data.recentSessions) storage.setItem('japdhara_jaap_history', data.recentSessions);

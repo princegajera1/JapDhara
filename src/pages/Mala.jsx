@@ -16,7 +16,7 @@ import Modal from '../components/common/Modal';
 import Toast from '../components/common/Toast';
 import useApp from '../hooks/useApp';
 import { INITIAL_MANTRAS } from '../data/mantras';
-import { getMalaProgressDetails, MALA_BEADS } from '../utils/malaUtils';
+import { getMalaProgressDetails, resetCurrentMalaProgress, MALA_BEADS } from '../utils/malaUtils';
 import { playSpiritualSound } from '../utils/audioUtils';
 import { triggerHaptic } from '../utils/hapticUtils';
 
@@ -41,6 +41,8 @@ export const Mala = () => {
   const [floatingItems, setFloatingItems] = useState([]);
 
   const prevCountRef = useRef(todayCount);
+  const celebrationTimerRef = useRef(null);
+  const tapAnimationTimerRef = useRef(null);
 
   const availableMantras = [...INITIAL_MANTRAS, ...customMantras];
 
@@ -50,6 +52,14 @@ export const Mala = () => {
 
   // Generate 108 beads dynamically
   const beads = Array.from({ length: MALA_BEADS }, (_, i) => i + 1);
+
+  // Clean up timers on unmount
+  useEffect(() => {
+    return () => {
+      if (celebrationTimerRef.current) clearTimeout(celebrationTimerRef.current);
+      if (tapAnimationTimerRef.current) clearTimeout(tapAnimationTimerRef.current);
+    };
+  }, []);
 
   // Calculate angles for circular placement (starting at top -90deg)
   const getBeadCoordinates = (index, size = 300, radius = 125) => {
@@ -82,13 +92,15 @@ export const Mala = () => {
       setShowCelebration(true);
       playSpiritualSound('temple_bell', settings?.soundEnabled !== false);
       triggerHaptic('mala_complete');
-      setTimeout(() => setShowCelebration(false), 3500);
+      if (celebrationTimerRef.current) clearTimeout(celebrationTimerRef.current);
+      celebrationTimerRef.current = setTimeout(() => setShowCelebration(false), 3500);
     }
 
     prevCountRef.current = nextCount;
 
     setTapAnimation(true);
-    setTimeout(() => setTapAnimation(false), 120);
+    if (tapAnimationTimerRef.current) clearTimeout(tapAnimationTimerRef.current);
+    tapAnimationTimerRef.current = setTimeout(() => setTapAnimation(false), 120);
 
     const newItem = { id: Date.now() + Math.random(), label: '+1' };
     setFloatingItems((prev) => [...prev.slice(-4), newItem]);
@@ -100,6 +112,10 @@ export const Mala = () => {
 
   useEffect(() => {
     const handleKeyDown = (e) => {
+      const target = e.target;
+      const isInput = target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT' || target.isContentEditable);
+      if (isInput) return;
+
       if (e.code === 'Space' && !isResetModalOpen && !isMantraModalOpen) {
         e.preventDefault();
         handleChantMala();
@@ -110,7 +126,8 @@ export const Mala = () => {
   }, [todayCount, isResetModalOpen, isMantraModalOpen]);
 
   const handleConfirmReset = () => {
-    setTodayCount(0);
+    const resetCount = resetCurrentMalaProgress(todayCount);
+    setTodayCount(resetCount);
     setIsResetModalOpen(false);
   };
 

@@ -35,7 +35,6 @@ export const Onboarding = () => {
 
   const handleFinish = (e) => {
     if (e) e.stopPropagation();
-    localStorage.setItem('japdhara_onboarding_completed', 'true');
     completeOnboarding();
     navigate('/home', { replace: true });
   };
